@@ -14,15 +14,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 
 # -------------------
-# CONFIG
-# -------------------
-#CLOUD_NAME = "dtcwdpen3"
-#API_KEY = "411836751638167"
-#API_SECRET = "CIZF5hZUA4-izKSWfNA2boVkLfQ"
-#GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PB-smeCbADxjls4_H_0G-6wv1lBCA3YRDsYAI4q7InQ/edit?gid=0#gid=0"
-
-
-# -------------------
 # LOAD SECRETS
 # -------------------
 # Local development: load from .env
