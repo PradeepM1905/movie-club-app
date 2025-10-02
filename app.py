@@ -5,6 +5,24 @@ import pandas as pd
 import altair as alt
 import cloudinary
 import cloudinary.uploader
+from oauth2client.service_account import ServiceAccountCredentials
+import json
+
+# Convert Streamlit secrets to dictionary
+credentials_dict = {
+    "type": st.secrets["type"],
+    "project_id": st.secrets["project_id"],
+    "private_key_id": st.secrets["private_key_id"],
+    "private_key": st.secrets["private_key"],
+    "client_email": st.secrets["client_email"],
+    "client_id": st.secrets["client_id"],
+    "auth_uri": st.secrets["auth_uri"],
+    "token_uri": st.secrets["token_uri"],
+    "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
+    "client_x509_cert_url": st.secrets["client_x509_cert_url"]
+}
+
+gc = gspread.service_account_from_dict(credentials_dict)
 
 # -------------------
 # CONFIG
@@ -12,7 +30,7 @@ import cloudinary.uploader
 CLOUD_NAME = "dtcwdpen3"
 API_KEY = "411836751638167"
 API_SECRET = "CIZF5hZUA4-izKSWfNA2boVkLfQ"
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PB-smeCbADxjls4_H_0G-6wv1lBCA3YRDsYAI4q7InQ/edit?gid=0#gid=0"
+#GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PB-smeCbADxjls4_H_0G-6wv1lBCA3YRDsYAI4q7InQ/edit?gid=0#gid=0"
 
 # Configure Cloudinary
 try:
