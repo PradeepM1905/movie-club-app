@@ -7,3 +7,4 @@ cloudinary==1.33.0
 requests==2.31.0
 pillow==10.2.0
 numpy==1.26.4
+python-dotenv==1.0.1
