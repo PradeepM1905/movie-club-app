@@ -3,11 +3,9 @@ import streamlit as st
 import gspread
 from datetime import datetime
 import pandas as pd
-import altair as alt
 import cloudinary
 import cloudinary.uploader
 from oauth2client.service_account import ServiceAccountCredentials
-import json
 
 # -------------------
 # PAGE CONFIG
@@ -58,7 +56,7 @@ try:
     sheet = gc.open_by_url(GOOGLE_SHEET_URL)
     suggestions_ws = sheet.worksheet("Suggestions")
     ratings_ws = sheet.worksheet("Ratings")
-    voting_ws = sheet.worksheet("Voting")  # new voting sheet
+    voting_ws = sheet.worksheet("Voting")
 except Exception as e:
     st.warning(f"Google Sheets connection error: {e}")
     suggestions_ws = ratings_ws = voting_ws = None
@@ -68,7 +66,7 @@ except Exception as e:
 # -------------------
 st.title("🎬 Movie Club")
 
-menu = st.sidebar.radio("Navigation", ["Suggest Movie", "Rate Movies", "Voting", "Dashboard"])
+menu = st.sidebar.radio("Navigation", ["Suggest Movie", "Voting", "Rate Movies", "Dashboard"])
 
 # -------------------
 # PAGE 1: Suggest Movie
@@ -96,18 +94,58 @@ if menu == "Suggest Movie":
             if suggestions_ws:
                 try:
                     suggestions_ws.append_row([user_name, movie_name, genre, description, image_url, str(datetime.now())])
-                    st.success("✅ Your movie suggestion has been submitted anonymously!")
+                    st.success("✅ Your movie suggestion has been submitted!")
                 except Exception as e:
                     st.warning(f"Failed to write to Google Sheets: {e}")
             else:
                 st.warning("Google Sheets not connected. Suggestion not saved.")
 
 # -------------------
-# PAGE 2: Rate Movies
+# PAGE 2: Voting
+# -------------------
+elif menu == "Voting":
+    st.header("Vote if you have watched the movie")
+    voter_name = st.text_input("Your Name for Voting")
+
+    movies = []
+    if suggestions_ws:
+        try:
+            movies = suggestions_ws.get_all_records()
+        except Exception as e:
+            st.warning(f"Failed to fetch suggestions: {e}")
+
+    votes_data = []
+    if movies:
+        for movie in movies:
+            st.subheader(movie.get('movie_name', 'Unknown'))
+            st.write(f"Suggested by: {movie.get('user_name','')}")
+            st.write(f"Genre: {movie.get('genre','')}")
+            st.write(f"Where to watch: {movie.get('description','')}")
+            if movie.get('image_url'):
+                st.image(movie['image_url'], width=200)
+            watched = st.checkbox("Have you watched this?", key=f"vote_{movie.get('movie_name','')}")
+            st.markdown("---")
+            votes_data.append((movie.get('movie_name',''), watched))
+
+        if st.button("Submit Votes"):
+            if not voter_name:
+                st.error("Please enter your name to vote!")
+            elif voting_ws:
+                try:
+                    for movie_name, watched in votes_data:
+                        voting_ws.append_row([movie_name, voter_name, watched, str(datetime.now())])
+                    st.success("✅ Votes submitted!")
+                except Exception as e:
+                    st.warning(f"Failed to submit votes: {e}")
+            else:
+                st.warning("Google Sheets not connected. Votes not saved.")
+
+# -------------------
+# PAGE 3: Rate Movies
 # -------------------
 elif menu == "Rate Movies":
     st.header("Rate Suggested Movies")
-    user_name = st.text_input("Enter your name or nickname")
+    rater_name = st.text_input("Enter your name or nickname")
 
     movies = []
     if suggestions_ws:
@@ -122,65 +160,35 @@ elif menu == "Rate Movies":
         ratings_data = []
         for movie in movies:
             st.subheader(movie.get('movie_name', 'Unknown'))
-            st.write(f"Genre: {movie.get('genre', '')}")
-            st.write(movie.get('description', ''))
+            st.write(f"Suggested by: {movie.get('user_name','')}")
+            st.write(f"Genre: {movie.get('genre','')}")
+            st.write(f"Where to watch: {movie.get('description','')}")
             if movie.get('image_url'):
                 st.image(movie['image_url'], width=200)
-            rating = st.select_slider(
-                f"Rate {movie.get('movie_name', '')}",
-                options=[5, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10],
-                value=5,
-                key=movie.get('movie_name', '')
+            rating = st.slider(
+                f"Rate {movie.get('movie_name','')}",
+                min_value=5.0,
+                max_value=10.0,
+                value=5.0,
+                step=0.5,
+                key=f"rating_{movie.get('movie_name','')}"
             )
-            did_not_watch = st.checkbox(f"Did not watch {movie.get('movie_name', '')}", key=f"dnw_{movie.get('movie_name', '')}")
+            did_not_watch = st.checkbox(f"Did not watch {movie.get('movie_name','')}", key=f"dnw_{movie.get('movie_name','')}")
             st.markdown("---")
-            ratings_data.append((movie.get('movie_name', ''), rating, did_not_watch))
+            ratings_data.append((movie.get('movie_name',''), rating, did_not_watch))
 
         if st.button("Submit All Ratings"):
-            if not user_name:
+            if not rater_name:
                 st.error("Please enter your name before submitting ratings!")
             elif ratings_ws:
                 try:
                     for movie_name, rating, did_not_watch in ratings_data:
-                        ratings_ws.append_row([movie_name, user_name, rating, did_not_watch, str(datetime.now())])
+                        ratings_ws.append_row([movie_name, rater_name, rating, did_not_watch, str(datetime.now())])
                     st.success("✅ All ratings submitted successfully!")
                 except Exception as e:
                     st.warning(f"Failed to write ratings: {e}")
             else:
                 st.warning("Google Sheets not connected. Ratings not saved.")
-
-# -------------------
-# PAGE 3: Voting
-# -------------------
-elif menu == "Voting":
-    st.header("Vote if you have watched the movie")
-    user_name = st.text_input("Your Name for Voting")
-
-    movies = []
-    if suggestions_ws:
-        try:
-            movies = suggestions_ws.get_all_records()
-        except Exception as e:
-            st.warning(f"Failed to fetch suggestions: {e}")
-
-    votes_data = []
-    if movies:
-        for movie in movies:
-            watched = st.checkbox(f"Have you watched {movie.get('movie_name', '')}?", key=f"vote_{movie.get('movie_name', '')}")
-            votes_data.append((movie.get('movie_name', ''), watched))
-
-        if st.button("Submit Votes"):
-            if not user_name:
-                st.error("Please enter your name to vote!")
-            elif voting_ws:
-                try:
-                    for movie_name, watched in votes_data:
-                        voting_ws.append_row([movie_name, user_name, watched, str(datetime.now())])
-                    st.success("✅ Votes submitted!")
-                except Exception as e:
-                    st.warning(f"Failed to submit votes: {e}")
-            else:
-                st.warning("Google Sheets not connected. Votes not saved.")
 
 # -------------------
 # PAGE 4: Dashboard
