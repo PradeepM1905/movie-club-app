@@ -1,5 +1,9 @@
 import os
 import streamlit as st
+
+# Must be first Streamlit command
+st.set_page_config(page_title="Movie Club", page_icon="🎬", layout="wide")
+
 import gspread
 from datetime import datetime
 import pandas as pd
@@ -78,7 +82,6 @@ except Exception as e:
 # -------------------
 # STREAMLIT UI
 # -------------------
-st.set_page_config(page_title="Movie Club", page_icon="🎬", layout="wide")
 st.title("🎬 Movie Club App (Robust Version)")
 
 menu = st.sidebar.radio("Navigation", ["Suggest Movie", "Rate Movies", "Dashboard"])
