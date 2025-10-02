@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import gspread
 from datetime import datetime
@@ -8,31 +9,34 @@ import cloudinary.uploader
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
-# Convert Streamlit secrets to dictionary
-credentials_dict = {
-    "type": st.secrets["type"],
-    "project_id": st.secrets["project_id"],
-    "private_key_id": st.secrets["private_key_id"],
-    "private_key": st.secrets["private_key"],
-    "client_email": st.secrets["client_email"],
-    "client_id": st.secrets["client_id"],
-    "auth_uri": st.secrets["auth_uri"],
-    "token_uri": st.secrets["token_uri"],
-    "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
-    "client_x509_cert_url": st.secrets["client_x509_cert_url"]
-}
-
-gc = gspread.service_account_from_dict(credentials_dict)
-
 # -------------------
 # CONFIG
 # -------------------
-CLOUD_NAME = "dtcwdpen3"
-API_KEY = "411836751638167"
-API_SECRET = "CIZF5hZUA4-izKSWfNA2boVkLfQ"
+#CLOUD_NAME = "dtcwdpen3"
+#API_KEY = "411836751638167"
+#API_SECRET = "CIZF5hZUA4-izKSWfNA2boVkLfQ"
 #GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PB-smeCbADxjls4_H_0G-6wv1lBCA3YRDsYAI4q7InQ/edit?gid=0#gid=0"
 
-# Configure Cloudinary
+
+# -------------------
+# LOAD SECRETS
+# -------------------
+# Local development: load from .env
+if "CLOUD_NAME" not in st.secrets:
+    from dotenv import load_dotenv
+    load_dotenv()  # reads variables from .env
+
+# Cloudinary credentials
+CLOUD_NAME = st.secrets["CLOUD_NAME"] if "CLOUD_NAME" in st.secrets else os.getenv("CLOUD_NAME")
+API_KEY = st.secrets["API_KEY"] if "API_KEY" in st.secrets else os.getenv("API_KEY")
+API_SECRET = st.secrets["API_SECRET"] if "API_SECRET" in st.secrets else os.getenv("API_SECRET")
+
+# Google Sheets URL
+GOOGLE_SHEET_URL = st.secrets["GOOGLE_SHEET_URL"] if "GOOGLE_SHEET_URL" in st.secrets else os.getenv("GOOGLE_SHEET_URL")
+
+# -------------------
+# CONFIGURE CLOUDINARY
+# -------------------
 try:
     cloudinary.config(
         cloud_name=CLOUD_NAME,
@@ -46,7 +50,23 @@ except Exception as e:
 # CONNECT TO GOOGLE SHEETS
 # -------------------
 try:
-    gc = gspread.service_account(filename="credentials.json")
+    if "type" in st.secrets:  # Streamlit Cloud
+        credentials_dict = {
+            "type": st.secrets["type"],
+            "project_id": st.secrets["project_id"],
+            "private_key_id": st.secrets["private_key_id"],
+            "private_key": st.secrets["private_key"],
+            "client_email": st.secrets["client_email"],
+            "client_id": st.secrets["client_id"],
+            "auth_uri": st.secrets["auth_uri"],
+            "token_uri": st.secrets["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["client_x509_cert_url"]
+        }
+        gc = gspread.service_account_from_dict(credentials_dict)
+    else:  # Local
+        gc = gspread.service_account(filename="credentials.json")
+
     sheet = gc.open_by_url(GOOGLE_SHEET_URL)
     suggestions_ws = sheet.worksheet("Suggestions")
     ratings_ws = sheet.worksheet("Ratings")
