@@ -536,18 +536,27 @@ elif selected == "Finalize Sprint":
         # 2. Calculate bonus for movies suggested that no one watched
         user_suggestions = df_suggestions[df_suggestions['user_name'] == user]['movie_name'].tolist()
         bonus = 0
-        if 'movie_name' not in df_votes.columns:
-            st.error(f"Column 'movie_name' not found in Voting data. Available columns: {list(df_votes.columns)}")
+        
         for movie in user_suggestions:
-            # Check if anyone watched this movie
-            
-            movie_votes = df_votes[(df_votes['movie_name'] == movie) & (df_votes['watched'] == True)]
-            if len(movie_votes) == 0:
+            # Handle case when Voting sheet is empty - no one watched any movies
+            if df_votes.empty:
                 bonus += bonus_per_new_movie
+            else:
+                # Check if anyone watched this movie
+                movie_votes = df_votes[(df_votes['movie_name'] == movie) & (df_votes['watched'] == True)]
+                if len(movie_votes) == 0:
+                    bonus += bonus_per_new_movie
         
         # 3. Calculate deductions for movies the user did not watch
         all_movies = df_suggestions['movie_name'].unique()
-        user_watched_movies = df_votes[(df_votes['user_name'] == user) & (df_votes['watched'] == True)]['movie_name'].tolist()
+        
+        # Handle case when Voting sheet is empty
+        if df_votes.empty:
+            # If no voting data, user didn't watch any movies
+            user_watched_movies = []
+        else:
+            user_watched_movies = df_votes[(df_votes['user_name'] == user) & (df_votes['watched'] == True)]['movie_name'].tolist()
+        
         movies_not_watched = [movie for movie in all_movies if movie not in user_watched_movies]
         deductions = len(movies_not_watched) * deduction_per_missed_movie
         
