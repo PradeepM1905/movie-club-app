@@ -87,17 +87,23 @@ def login(username, password=None):
     st.session_state.role = role
     st.success(f"Logged in as {username} ({role})")
     return True
-
+    
 if not st.session_state.logged_in:
     st.title("🎬 Movie Club Login")
     username = st.selectbox("Select Username", users_list)
+    
+    # Only ask password for admin
+    password = None
     if users_roles.get(username) == "admin":
         password = st.text_input("Admin Password", type="password")
-    else:
-        password = None
-    if st.button("Login"):
-        login(username, password)
-    st.stop()
+    
+    login_clicked = st.button("Login")
+    
+    if login_clicked:
+        if login(username, password):
+            st.experimental_rerun()  # Rerun app after login to navigate to main pages
+    st.stop()  # Stop until login is successful
+
 
 # -------------------
 # CLOUDINARY CONFIG
