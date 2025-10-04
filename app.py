@@ -80,7 +80,16 @@ except Exception as e:
     sprints_list = []
 
 def get_current_sprint(sprints_list):
-    today = datetime.today().date()
+    #today = datetime.today().date()
+
+    #for Testing----------------------
+    test_date = st.sidebar.date_input(
+        "Select current date (for testing)",
+        value=datetime.today()
+    )
+    today = test_date
+    #----------------------------------
+    
     for sprint in sprints_list:
         start_date = datetime.strptime(sprint["start_date"], "%Y-%m-%d").date()
         end_date = datetime.strptime(sprint["end_date"], "%Y-%m-%d").date()
@@ -95,6 +104,7 @@ current_sprint_id, current_sprint_desc = get_current_sprint(sprints_list)
 # -------------------
 st.title("🎬 Movie Club")
 st.write(f"📅 Current Sprint: {current_sprint_id} {current_sprint_desc}")
+st.write(f"📅 Effective Date: {today.strftime('%Y-%m-%d')}")
 
 menu = st.sidebar.radio("Navigation", ["Suggest Movie", "Voting", "Rate Movies", "Dashboard", "Finalize Sprint"])
 
@@ -373,3 +383,14 @@ elif menu == "Finalize Sprint":
 
         except Exception as e:
             st.warning(f"Failed to finalize sprint: {e}")
+
+
+
+
+def get_current_sprint(sprints_list, current_date):
+    for sprint in sprints_list:
+        start_date = datetime.strptime(sprint["start_date"], "%Y-%m-%d").date()
+        end_date = datetime.strptime(sprint["end_date"], "%Y-%m-%d").date()
+        if start_date <= current_date <= end_date:
+            return sprint["sprint_id"], sprint.get("description", "")
+    return None, ""
