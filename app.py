@@ -538,7 +538,6 @@ elif selected == "Finalize Sprint":
         bonus = 0
         if 'movie_name' not in df_votes.columns:
             st.error(f"Column 'movie_name' not found in Voting data. Available columns: {list(df_votes.columns)}")
-            return
         for movie in user_suggestions:
             # Check if anyone watched this movie
             
