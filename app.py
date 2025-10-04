@@ -287,7 +287,7 @@ elif menu == "Dashboard":
             movie_df = df_ratings[df_ratings["movie_name"] == movie]
             avg_rating = movie_df.loc[~movie_df["did_not_watch"], "rating"].mean()
             st.write(f"**{movie}** - Average Rating: {avg_rating:.2f}")
-            st.table(movie_df[["rater_name", "rating", "did_not_watch"]])
+            st.table(movie_df[["user_name", "rating", "did_not_watch"]])
 
 # -------------------
 # PAGE 5: Finalize Sprint (Admin)
