@@ -101,7 +101,7 @@ if not st.session_state.logged_in:
     
     if login_clicked:
         if login(username, password):
-            st.experimental_rerun()  # Rerun app after login to navigate to main pages
+            st.rerun()
     st.stop()  # Stop until login is successful
 
 
