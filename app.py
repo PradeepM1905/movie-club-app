@@ -61,6 +61,14 @@ except Exception as e:
     st.warning(f"Google Sheets connection error: {e}")
     suggestions_ws = ratings_ws = voting_ws = None
 
+try:
+    users_ws = sheet.worksheet("Users")
+    users_list = [u["user_name"] for u in users_ws.get_all_records() if u.get("user_name")]
+except Exception as e:
+    st.warning(f"Failed to load users: {e}")
+    users_ws = None
+    users_list = []
+    
 # -------------------
 # STREAMLIT UI
 # -------------------
@@ -73,7 +81,7 @@ menu = st.sidebar.radio("Navigation", ["Suggest Movie", "Voting", "Rate Movies",
 # -------------------
 if menu == "Suggest Movie":
     st.header("Suggest a Movie")
-    user_name = st.text_input("Your Name")
+    user_name = st.selectbox("Your Name", users_list if users_list else ["Select user"])
     movie_name = st.text_input("Movie Name")
     genre = st.text_input("Genre")
     description = st.text_area("Where to watch it?")
@@ -105,7 +113,7 @@ if menu == "Suggest Movie":
 # -------------------
 elif menu == "Voting":
     st.header("Vote if you have watched the movie")
-    voter_name = st.text_input("Your Name for Voting")
+    voter_name = st.selectbox("Your Name for Voting", users_list if users_list else ["Select user"])
 
     movies = []
     if suggestions_ws:
@@ -145,7 +153,7 @@ elif menu == "Voting":
 # -------------------
 elif menu == "Rate Movies":
     st.header("Rate Suggested Movies")
-    rater_name = st.text_input("Enter your name or nickname")
+    rater_name = st.selectbox("Select your name", users_list if users_list else ["Select user"])
 
     movies = []
     if suggestions_ws:
