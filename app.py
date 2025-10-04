@@ -544,7 +544,7 @@ elif selected == "Finalize Sprint":
         
         # 3. Calculate deductions for movies the user did not watch
         all_movies = df_suggestions['movie_name'].unique()
-        user_watched_movies = df_votes[(df_votes['voter_name'] == user) & (df_votes['watched'] == True)]['movie_name'].tolist()
+        user_watched_movies = df_votes[(df_votes['user_name'] == user) & (df_votes['watched'] == True)]['movie_name'].tolist()
         movies_not_watched = [movie for movie in all_movies if movie not in user_watched_movies]
         deductions = len(movies_not_watched) * deduction_per_missed_movie
         
