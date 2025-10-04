@@ -527,7 +527,7 @@ elif selected == "Finalize Sprint":
     # Calculate points for each user
     for user in user_points.keys():
         # 1. Calculate average rating of movies the user has watched
-        user_ratings = df_ratings[(df_ratings['rater_name'] == user) & (~df_ratings['did_not_watch'])]
+        user_ratings = df_ratings[(df_ratings['user_name'] == user) & (~df_ratings['did_not_watch'])]
         if len(user_ratings) > 0:
             average_rating = user_ratings['rating'].mean()
         else:
