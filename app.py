@@ -79,17 +79,16 @@ except Exception as e:
     st.warning(f"Failed to load sprints: {e}")
     sprints_list = []
 
-def get_current_sprint(sprints_list):
-    #today = datetime.today().date()
+#today = datetime.today().date()
 
-    #for Testing----------------------
-    test_date = st.sidebar.date_input(
-        "Select current date (for testing)",
-        value=datetime.today()
-    )
-    today = test_date
-    #----------------------------------
-    
+#for Testing----------------------
+test_date = st.sidebar.date_input(
+    "Select current date (for testing)",
+    value=datetime.today()
+)
+today = test_date
+#----------------------------------
+def get_current_sprint(sprints_list,today):
     for sprint in sprints_list:
         start_date = datetime.strptime(sprint["start_date"], "%Y-%m-%d").date()
         end_date = datetime.strptime(sprint["end_date"], "%Y-%m-%d").date()
@@ -97,7 +96,7 @@ def get_current_sprint(sprints_list):
             return sprint["sprint_id"], sprint.get("description", "")
     return None, ""
 
-current_sprint_id, current_sprint_desc = get_current_sprint(sprints_list)
+current_sprint_id, current_sprint_desc = get_current_sprint(sprints_list,today)
 
 # -------------------
 # STREAMLIT UI
