@@ -301,6 +301,18 @@ elif menu == "Finalize Sprint":
             sprint_index = next((i for i, s in enumerate(sprints_list) if s["sprint_id"] == current_sprint_id), None)
             prev_sprint_id = sprints_list[sprint_index-1]["sprint_id"] if sprint_index and sprint_index > 0 else None
 
+            # 1.5. Fetch relevant suggestions and ratings from Sheets
+            suggestions = []
+            ratings = []
+            points_data = []
+
+            if suggestions_ws:
+                suggestions = suggestions_ws.get_all_records()
+            if ratings_ws:
+                ratings = ratings_ws.get_all_records()
+            if points_ws:
+                points_data = points_ws.get_all_records()
+                
             # 2. Fetch relevant suggestions and ratings
             suggestions_prev = [m for m in suggestions if m["sprint"] == prev_sprint_id]
             ratings_prev = [r for r in ratings if r["sprint"] == prev_sprint_id]
