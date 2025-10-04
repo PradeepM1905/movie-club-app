@@ -57,31 +57,54 @@ try:
     suggestions_ws = sheet.worksheet("Suggestions")
     ratings_ws = sheet.worksheet("Ratings")
     voting_ws = sheet.worksheet("Voting")
+    points_ws = sheet.worksheet("Points")
+    users_ws = sheet.worksheet("Users")
+    sprints_ws = sheet.worksheet("Sprints")
 except Exception as e:
     st.warning(f"Google Sheets connection error: {e}")
-    suggestions_ws = ratings_ws = voting_ws = None
+    suggestions_ws = ratings_ws = voting_ws = points_ws = users_ws = sprints_ws = None
 
+# -------------------
+# FETCH USERS AND SPRINTS
+# -------------------
 try:
-    users_ws = sheet.worksheet("Users")
     users_list = [u["user_name"] for u in users_ws.get_all_records() if u.get("user_name")]
 except Exception as e:
     st.warning(f"Failed to load users: {e}")
-    users_ws = None
     users_list = []
-    
+
+try:
+    sprints_list = sprints_ws.get_all_records() if sprints_ws else []
+except Exception as e:
+    st.warning(f"Failed to load sprints: {e}")
+    sprints_list = []
+
+def get_current_sprint(sprints_list):
+    today = datetime.today().date()
+    for sprint in sprints_list:
+        start_date = datetime.strptime(sprint["start_date"], "%Y-%m-%d").date()
+        end_date = datetime.strptime(sprint["end_date"], "%Y-%m-%d").date()
+        if start_date <= today <= end_date:
+            return sprint["sprint_id"], sprint.get("description", "")
+    return None, ""
+
+current_sprint_id, current_sprint_desc = get_current_sprint(sprints_list)
+
 # -------------------
 # STREAMLIT UI
 # -------------------
 st.title("🎬 Movie Club")
+st.write(f"📅 Current Sprint: {current_sprint_id} {current_sprint_desc}")
 
-menu = st.sidebar.radio("Navigation", ["Suggest Movie", "Voting", "Rate Movies", "Dashboard"])
+menu = st.sidebar.radio("Navigation", ["Suggest Movie", "Voting", "Rate Movies", "Dashboard", "Finalize Sprint"])
 
 # -------------------
 # PAGE 1: Suggest Movie
 # -------------------
 if menu == "Suggest Movie":
     st.header("Suggest a Movie")
-    user_name = st.selectbox("Your Name", users_list if users_list else ["Select user"])
+
+    user_name = st.selectbox("Your Name", users_list)
     movie_name = st.text_input("Movie Name")
     genre = st.text_input("Genre")
     description = st.text_area("Where to watch it?")
@@ -101,7 +124,15 @@ if menu == "Suggest Movie":
 
             if suggestions_ws:
                 try:
-                    suggestions_ws.append_row([user_name, movie_name, genre, description, image_url, str(datetime.now())])
+                    suggestions_ws.append_row([
+                        current_sprint_id,
+                        user_name,
+                        movie_name,
+                        genre,
+                        description,
+                        image_url,
+                        str(datetime.now())
+                    ])
                     st.success("✅ Your movie suggestion has been submitted!")
                 except Exception as e:
                     st.warning(f"Failed to write to Google Sheets: {e}")
@@ -113,25 +144,26 @@ if menu == "Suggest Movie":
 # -------------------
 elif menu == "Voting":
     st.header("Vote if you have watched the movie")
-    voter_name = st.selectbox("Your Name for Voting", users_list if users_list else ["Select user"])
+    voter_name = st.selectbox("Your Name for Voting", users_list)
 
     movies = []
     if suggestions_ws:
         try:
-            movies = suggestions_ws.get_all_records()
+            # Fetch only current sprint suggestions
+            all_movies = suggestions_ws.get_all_records()
+            movies = [m for m in all_movies if m["sprint"] == current_sprint_id]
         except Exception as e:
             st.warning(f"Failed to fetch suggestions: {e}")
 
     votes_data = []
     if movies:
-        for movie in movies:
+        for idx, movie in enumerate(movies):
             st.subheader(movie.get('movie_name', 'Unknown'))
-            st.write(f"Suggested by: {movie.get('user_name','')}")
             st.write(f"Genre: {movie.get('genre','')}")
             st.write(f"Where to watch: {movie.get('description','')}")
             if movie.get('image_url'):
                 st.image(movie['image_url'], width=200)
-            watched = st.checkbox("Have you watched this?", key=f"vote_{movie.get('movie_name','')}")
+            watched = st.checkbox("Have you watched this?", key=f"vote_{idx}")
             st.markdown("---")
             votes_data.append((movie.get('movie_name',''), watched))
 
@@ -141,34 +173,47 @@ elif menu == "Voting":
             elif voting_ws:
                 try:
                     for movie_name, watched in votes_data:
-                        voting_ws.append_row([movie_name, voter_name, watched, str(datetime.now())])
+                        voting_ws.append_row([
+                            current_sprint_id,
+                            movie_name,
+                            voter_name,
+                            watched,
+                            str(datetime.now())
+                        ])
                     st.success("✅ Votes submitted!")
                 except Exception as e:
                     st.warning(f"Failed to submit votes: {e}")
             else:
                 st.warning("Google Sheets not connected. Votes not saved.")
+    else:
+        st.info("No movie suggestions for this sprint yet.")
 
 # -------------------
 # PAGE 3: Rate Movies
 # -------------------
 elif menu == "Rate Movies":
     st.header("Rate Suggested Movies")
-    rater_name = st.selectbox("Select your name", users_list if users_list else ["Select user"])
+
+    rater_name = st.selectbox("Select your name", users_list)
 
     movies = []
     if suggestions_ws:
         try:
-            movies = suggestions_ws.get_all_records()
+            # Fetch previous sprint suggestions only
+            all_movies = suggestions_ws.get_all_records()
+            # Determine previous sprint
+            sprint_index = next((i for i, s in enumerate(sprints_list) if s["sprint_id"] == current_sprint_id), None)
+            prev_sprint_id = sprints_list[sprint_index-1]["sprint_id"] if sprint_index and sprint_index > 0 else None
+            movies = [m for m in all_movies if m["sprint"] == prev_sprint_id]
         except Exception as e:
             st.warning(f"Failed to fetch suggestions: {e}")
 
     if not movies:
-        st.info("No movies suggested yet.")
+        st.info("No movies to rate yet.")
     else:
         ratings_data = []
-        for movie in movies:
+        for idx, movie in enumerate(movies):
             st.subheader(movie.get('movie_name', 'Unknown'))
-            st.write(f"Suggested by: {movie.get('user_name','')}")
             st.write(f"Genre: {movie.get('genre','')}")
             st.write(f"Where to watch: {movie.get('description','')}")
             if movie.get('image_url'):
@@ -179,19 +224,26 @@ elif menu == "Rate Movies":
                 max_value=10.0,
                 value=5.0,
                 step=0.5,
-                key=f"rating_{movie.get('movie_name','')}"
+                key=f"rating_{idx}"
             )
-            did_not_watch = st.checkbox(f"Did not watch {movie.get('movie_name','')}", key=f"dnw_{movie.get('movie_name','')}")
+            did_not_watch = st.checkbox(f"Did not watch {movie.get('movie_name','')}", key=f"dnw_{idx}")
             st.markdown("---")
-            ratings_data.append((movie.get('movie_name',''), rating, did_not_watch))
+            ratings_data.append((movie.get('user_name',''), movie.get('movie_name',''), rating, did_not_watch))
 
         if st.button("Submit All Ratings"):
             if not rater_name:
-                st.error("Please enter your name before submitting ratings!")
+                st.error("Please select your name before submitting ratings!")
             elif ratings_ws:
                 try:
-                    for movie_name, rating, did_not_watch in ratings_data:
-                        ratings_ws.append_row([movie_name, rater_name, rating, did_not_watch, str(datetime.now())])
+                    for suggestor, movie_name, rating, did_not_watch in ratings_data:
+                        ratings_ws.append_row([
+                            prev_sprint_id,
+                            movie_name,
+                            rater_name,
+                            rating,
+                            did_not_watch,
+                            str(datetime.now())
+                        ])
                     st.success("✅ All ratings submitted successfully!")
                 except Exception as e:
                     st.warning(f"Failed to write ratings: {e}")
@@ -206,6 +258,7 @@ elif menu == "Dashboard":
 
     ratings = []
     suggestions = []
+    points_data = []
     if ratings_ws:
         try:
             ratings = ratings_ws.get_all_records()
@@ -216,6 +269,11 @@ elif menu == "Dashboard":
             suggestions = suggestions_ws.get_all_records()
         except Exception as e:
             st.warning(f"Failed to fetch suggestions: {e}")
+    if points_ws:
+        try:
+            points_data = points_ws.get_all_records()
+        except Exception as e:
+            st.warning(f"Failed to fetch points: {e}")
 
     if not ratings:
         st.info("No ratings yet.")
@@ -229,21 +287,77 @@ elif menu == "Dashboard":
             movie_df = df_ratings[df_ratings["movie_name"] == movie]
             avg_rating = movie_df.loc[~movie_df["did_not_watch"], "rating"].mean()
             st.write(f"**{movie}** - Average Rating: {avg_rating:.2f}")
-            st.table(movie_df[["user_name", "rating", "did_not_watch"]])
+            st.table(movie_df[["rater_name", "rating", "did_not_watch"]])
 
-        st.write("### Points by User")
-        points_list = []
-        for user in df_ratings["user_name"].unique():
-            user_df = df_ratings[df_ratings["user_name"] == user]
-            avg_point = user_df.loc[~user_df["did_not_watch"], "rating"].mean()
-            bonus = 0.5 if user_df["did_not_watch"].sum() == 0 else 0
-            deduction = 0.25 * user_df["did_not_watch"].sum()
-            total_points = avg_point + bonus - deduction
-            points_list.append({
-                "user_name": user,
-                "avg_rating": avg_point,
-                "bonus": bonus,
-                "did_not_watch_deduction": deduction,
-                "total_points": total_points
-            })
-        st.table(pd.DataFrame(points_list))
+# -------------------
+# PAGE 5: Finalize Sprint (Admin)
+# -------------------
+elif menu == "Finalize Sprint":
+    st.header("Finalize Sprint & Update Points")
+
+    if st.button("Calculate Points & Generate WhatsApp Message"):
+        try:
+            # 1. Determine previous sprint
+            sprint_index = next((i for i, s in enumerate(sprints_list) if s["sprint_id"] == current_sprint_id), None)
+            prev_sprint_id = sprints_list[sprint_index-1]["sprint_id"] if sprint_index and sprint_index > 0 else None
+
+            # 2. Fetch relevant suggestions and ratings
+            suggestions_prev = [m for m in suggestions if m["sprint"] == prev_sprint_id]
+            ratings_prev = [r for r in ratings if r["sprint"] == prev_sprint_id]
+
+            # 3. Build avg rating per movie
+            movie_points = {}
+            for movie in suggestions_prev:
+                movie_name = movie["movie_name"]
+                suggestor = movie["user_name"]
+                ratings_movie = [r for r in ratings_prev if r["movie_name"] == movie_name and not r["did_not_watch"]]
+                if ratings_movie:
+                    avg_rating = sum([r["rating"] for r in ratings_movie])/len(ratings_movie)
+                else:
+                    avg_rating = 0
+                bonus = 0.5 if len(ratings_movie)==0 else 0
+                movie_points[movie_name] = {"suggestor": suggestor, "avg_rating": avg_rating, "bonus": bonus}
+
+            # 4. Update points for users
+            total_points = {u["user_name"]: u.get("total_points",0) for u in points_data}
+            for movie_name, val in movie_points.items():
+                user = val["suggestor"]
+                add_points = val["avg_rating"] + val["bonus"]
+                total_points[user] = total_points.get(user, 0) + add_points
+
+            # Deduct 0.25 for users who did not watch movies
+            for r in ratings_prev:
+                if r["did_not_watch"]:
+                    user = r["rater_name"]
+                    total_points[user] = total_points.get(user,0) - 0.25
+
+            # 5. Save updated points back to Google Sheet
+            if points_ws:
+                # Clear existing points sheet
+                points_ws.clear()
+                points_ws.append_row(["user_name","total_points"])
+                for user, pts in total_points.items():
+                    points_ws.append_row([user, round(pts,3)])
+
+            # 6. Generate WhatsApp messages
+            rating_msg = f"🎥 {prev_sprint_id} Rating 🎥\n" + "━━━━━━━━━━━━━━\n"
+            for movie_name, val in movie_points.items():
+                rating_msg += f"🍿 {val['suggestor']}: {movie_name} - {val['avg_rating']:.3f}\n"
+            rating_msg += "━━━━━━━━━━━━━━"
+
+            leaderboard_msg = f"🏆 *Points after {prev_sprint_id} Sprint* 🏆\n" + "━━━━━━━━━━━━━━\n"
+            sorted_points = sorted(total_points.items(), key=lambda x: x[1], reverse=True)
+            for user, pts in sorted_points:
+                leaderboard_msg += f"👤 {user} : {pts:.3f}\n"
+            leaderboard_msg += "━━━━━━━━━━━━━━"
+
+            st.subheader("Sprint Rating Message")
+            st.text_area("Copy this message for WhatsApp", rating_msg, height=300)
+
+            st.subheader("Leaderboard Message")
+            st.text_area("Copy this message for WhatsApp", leaderboard_msg, height=300)
+
+            st.success("✅ Points calculated and messages generated!")
+
+        except Exception as e:
+            st.warning(f"Failed to finalize sprint: {e}")
