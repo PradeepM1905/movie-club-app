@@ -6,6 +6,7 @@ import pandas as pd
 import cloudinary
 import cloudinary.uploader
 from oauth2client.service_account import ServiceAccountCredentials
+import hashlib
 
 # ---------------------------------------
 # PAGE CONFIG
@@ -67,13 +68,23 @@ def reload_users():
     users_data = load_sheet("Users")
     users_roles = {}
     users_list = []
+    users_passwords = {}
     for row in users_data:
         uname = row.get("user_name")
         role = row.get("role", "normal").lower()
+        password = row.get("password", "")  # Get password from sheet
         if uname:
             users_list.append(uname)
             users_roles[uname] = role
-    return users_list, users_roles
+            users_passwords[uname] = password
+    return users_list, users_roles, users_passwords
+
+# ---------------------------------------
+# PASSWORD HASHING
+# ---------------------------------------
+def hash_password(password):
+    """Simple password hashing for basic security"""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 # ---------------------------------------
 # LOGIN SYSTEM
@@ -85,17 +96,31 @@ if "username" not in st.session_state:
 if "role" not in st.session_state:
     st.session_state.role = "normal"
 
-users_list, users_roles = reload_users()
+users_list, users_roles, users_passwords = reload_users()
 
 def login(username, password):
     if username not in users_roles:
         st.error("Invalid username")
         return False
+    
     role = users_roles[username]
+    
     if role == "admin":
+        # Admin uses the secret password
         if password != ADMIN_PASS:
             st.error("Incorrect admin password")
             return False
+    else:
+        # Normal user uses password from Google Sheets
+        stored_password_hash = users_passwords.get(username, "")
+        if not stored_password_hash:
+            st.error("No password set for this user. Please contact admin.")
+            return False
+        
+        if hash_password(password) != stored_password_hash:
+            st.error("Incorrect password")
+            return False
+    
     st.session_state.logged_in = True
     st.session_state.username = username
     st.session_state.role = role
@@ -105,13 +130,22 @@ def login(username, password):
 if not st.session_state.logged_in:
     st.title("🎬 Movie Club Login")
     username = st.selectbox("Select Username", users_list)
-    password = None
-    if users_roles.get(username) == "admin":
-        password = st.text_input("Admin Password", type="password")
+    
+    # Always show password field for all users
+    password = st.text_input("Password", type="password")
+    
+    # Show password hint based on user type
+    if username and users_roles.get(username) == "admin":
+        st.info("🔐 Admin login - enter admin password")
+    elif username:
+        st.info("🔐 User login - enter your personal password")
 
     if st.button("Login"):
-        if login(username, password):
-            st.rerun()
+        if not password:
+            st.error("Please enter your password")
+        else:
+            if login(username, password):
+                st.rerun()
     st.stop()
 
 # ---------------------------------------
@@ -349,21 +383,61 @@ elif selected == "Admin Panel":
         st.session_state.enable_rating = rating_enabled
         update_page_config()
 
-    st.subheader("Add New User")
-    new_user = st.text_input("New User Name")
-    role = st.selectbox("Role", ["normal", "admin"])
-    if st.button("Add User"):
-        if new_user:
-            try:
-                ws = sheet.worksheet("Users")
-                ws.append_row([new_user, role, 0])  # Start with 0 points
-                st.success(f"✅ Added {new_user} as {role}")
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e:
-                st.warning(f"Failed to add user: {e}")
+    st.subheader("User Management")
+    
+    tab1, tab2 = st.tabs(["Add New User", "Reset User Password"])
+    
+    with tab1:
+        st.write("Add a new user to the system")
+        new_user = st.text_input("New User Name")
+        role = st.selectbox("Role", ["normal", "admin"])
+        user_password = st.text_input("Set Password", type="password", key="new_user_password")
+        
+        if st.button("Add User"):
+            if new_user and user_password:
+                try:
+                    ws = sheet.worksheet("Users")
+                    # Hash the password before storing
+                    hashed_password = hash_password(user_password)
+                    ws.append_row([new_user, role, 0, hashed_password])  # Start with 0 points
+                    st.success(f"✅ Added {new_user} as {role}")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.warning(f"Failed to add user: {e}")
+            else:
+                st.error("Please enter both username and password")
+    
+    with tab2:
+        st.write("Reset password for existing user")
+        users_data = load_sheet("Users")
+        user_names = [user['user_name'] for user in users_data if user['user_name'] != st.session_state.username]
+        
+        if user_names:
+            selected_user = st.selectbox("Select User", user_names)
+            new_password = st.text_input("New Password", type="password", key="reset_password")
+            
+            if st.button("Reset Password"):
+                if new_password:
+                    try:
+                        ws = sheet.worksheet("Users")
+                        users_records = ws.get_all_records()
+                        
+                        # Find the user and update their password
+                        for i, user_record in enumerate(users_records):
+                            if user_record['user_name'] == selected_user:
+                                hashed_password = hash_password(new_password)
+                                # Update password in column 4 (D)
+                                ws.update_cell(i + 2, 4, hashed_password)
+                                st.success(f"✅ Password reset for {selected_user}")
+                                st.cache_data.clear()
+                                break
+                    except Exception as e:
+                        st.warning(f"Failed to reset password: {e}")
+                else:
+                    st.error("Please enter a new password")
         else:
-            st.error("Please enter a username")
+            st.info("No other users found")
 
 # ---------------------------------------
 # PAGE: FINALIZE SPRINT
