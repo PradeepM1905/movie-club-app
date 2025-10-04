@@ -69,14 +69,23 @@ def reload_users():
     users_roles = {}
     users_list = []
     users_passwords = {}
+    
+    st.write("Debug: Raw users data from sheet:", users_data)  # Debug line
+    
     for row in users_data:
         uname = row.get("user_name")
         role = row.get("role", "normal").lower()
-        password = row.get("password", "")  # Get password from sheet
+        # Try different possible column names for password
+        password = row.get("password") or row.get("pass") or row.get("pwd") or ""
+        
         if uname:
             users_list.append(uname)
             users_roles[uname] = role
             users_passwords[uname] = password
+            
+            # Debug each user
+            st.write(f"Debug: Loaded user '{uname}' with password: {'[SET]' if password else '[NOT SET]'}")
+    
     return users_list, users_roles, users_passwords
 
 # ---------------------------------------
@@ -104,6 +113,10 @@ def login(username, password):
         return False
     
     role = users_roles[username]
+    stored_password = users_passwords.get(username, "")
+    
+    # Debug information (you can remove this after testing)
+    st.write(f"Debug: User '{username}', Role: '{role}', Stored password present: {bool(stored_password)}")
     
     if role == "admin":
         # Admin uses the secret password
@@ -112,12 +125,15 @@ def login(username, password):
             return False
     else:
         # Normal user uses password from Google Sheets
-        stored_password_hash = users_passwords.get(username, "")
-        if not stored_password_hash:
+        if not stored_password or stored_password == "":
             st.error("No password set for this user. Please contact admin.")
             return False
         
-        if hash_password(password) != stored_password_hash:
+        # For testing: show what's being compared (remove after debugging)
+        st.write(f"Debug: Input password hash: {hash_password(password)}")
+        st.write(f"Debug: Stored password hash: {stored_password}")
+        
+        if hash_password(password) != stored_password:
             st.error("Incorrect password")
             return False
     
