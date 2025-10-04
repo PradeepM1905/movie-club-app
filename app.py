@@ -13,6 +13,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 # -----------------------
 st.set_page_config(page_title="Movie Club", layout="wide")
 
+st.write("Secrets loaded:", st.secrets.keys())
 # -----------------------
 # SECRETS / CONFIG
 # -----------------------
