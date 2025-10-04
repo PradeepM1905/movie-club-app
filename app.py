@@ -70,7 +70,7 @@ def reload_users():
     users_list = []
     users_passwords = {}
     
-    st.write("Debug: Raw users data from sheet:", users_data)  # Debug line
+    #st.write("Debug: Raw users data from sheet:", users_data)  # Debug line
     
     for row in users_data:
         uname = row.get("user_name")
@@ -84,7 +84,7 @@ def reload_users():
             users_passwords[uname] = password
             
             # Debug each user
-            st.write(f"Debug: Loaded user '{uname}' with password: {'[SET]' if password else '[NOT SET]'}")
+            #st.write(f"Debug: Loaded user '{uname}' with password: {'[SET]' if password else '[NOT SET]'}")
     
     return users_list, users_roles, users_passwords
 
