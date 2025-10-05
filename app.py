@@ -1092,7 +1092,7 @@ elif selected == "Finalize Sprint":
         leaderboard_data.append({
             "Rank": len(leaderboard_data) + 1,
             "User": user,
-            "Total Points": f"{points:.2f}",
+            "Total Points": f"{breakdown['total_rating_sum']:.2f}",
             "Avg Rating": f"{breakdown['avg_rating_points']:.2f}",
             "Deductions": f"-{breakdown['total_deductions']:.2f}",
             "Bonus": f"+{breakdown['bonus_new_movies']:.2f}",
