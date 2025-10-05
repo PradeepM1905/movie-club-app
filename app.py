@@ -1123,13 +1123,13 @@ elif selected == "Finalize Sprint":
             except (ValueError, TypeError):
                 current_user_points[user_name] = 0.0
         
-        # Update points in Users sheet (column 4)
+        # Update points in Users sheet (column 3)
         for i, user_record in enumerate(users_records):
             user_name = user_record['user_name']
             if user_name in user_points:
                 current_points = current_user_points.get(user_name, 0.0)
                 new_points = current_points + user_points[user_name]
-                ws_users.update_cell(i + 2, 4, round(new_points, 3))
+                ws_users.update_cell(i + 2, 3, round(new_points, 3))
         
         st.success("✅ Sprint points calculated and saved successfully!")
         
