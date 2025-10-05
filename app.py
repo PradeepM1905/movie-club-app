@@ -1010,22 +1010,22 @@ elif selected == "Finalize Sprint":
     
     # Calculate points for each user
     for user in df_users['user_name'].tolist():
-        # 1. Calculate average rating for movies suggested by this user (only watched movies)
+        # 1. Calculate AVERAGE rating for movies suggested by this user (only watched movies)
         user_suggested_movies = df_suggestions[df_suggestions['user_name'] == user]['movie_name'].tolist()
         
-        total_avg_rating = 0
-        rated_suggestions_count = 0
+        total_rating_sum = 0
+        total_rating_count = 0
         
         for movie in user_suggested_movies:
             # Get all ratings for this movie where people actually watched it
             movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
             if not movie_ratings.empty:
-                avg_rating = movie_ratings['rating'].mean()
-                total_avg_rating += avg_rating
-                rated_suggestions_count += 1
+                movie_avg_rating = movie_ratings['rating'].mean()
+                total_rating_sum += movie_avg_rating
+                total_rating_count += 1
         
-        # Calculate average rating of suggested movies (only for movies that were rated)
-        avg_rating_points = total_avg_rating if rated_suggestions_count > 0 else 0
+        # Calculate AVERAGE rating of suggested movies (average of averages)
+        avg_rating_points = total_rating_sum / total_rating_count if total_rating_count > 0 else 0
         
         # 2. Calculate deductions for movies this user did not watch
         user_not_watched = df_ratings[(df_ratings['user_name'] == user) & (df_ratings['did_not_watch'] == True)]
@@ -1039,14 +1039,15 @@ elif selected == "Finalize Sprint":
             if len(movie_ratings) == 0:
                 bonus += bonus_per_new_movie
         
-        # 4. Calculate total points
+        # 4. Calculate total points (avg_rating_points is already an average, so we use it directly)
         total_points = avg_rating_points - total_deductions + bonus
         
         # Store the breakdown
         user_breakdown[user] = {
             "avg_rating_points": avg_rating_points,
+            "total_rating_sum": total_rating_sum,
+            "rated_movies_count": total_rating_count,
             "movies_suggested": len(user_suggested_movies),
-            "movies_suggested_rated": rated_suggestions_count,
             "movies_not_watched": len(user_not_watched),
             "total_deductions": total_deductions,
             "bonus_new_movies": bonus,
@@ -1063,13 +1064,14 @@ elif selected == "Finalize Sprint":
             with col1:
                 st.write("**Rating Points**")
                 st.write(f"Movies Suggested: {breakdown['movies_suggested']}")
-                st.write(f"Movies Rated by Others: {breakdown['movies_suggested_rated']}")
-                st.write(f"Avg Rating Points: {breakdown['avg_rating_points']:.2f}")
+                st.write(f"Movies Rated by Others: {breakdown['rated_movies_count']}")
+                st.write(f"Total Rating Sum: {breakdown['total_rating_sum']:.2f}")
+                st.write(f"**Avg Rating Points: {breakdown['avg_rating_points']:.2f}**")
             
             with col2:
                 st.write("**Deductions**")
                 st.write(f"Movies Not Watched: {breakdown['movies_not_watched']}")
-                st.write(f"Total Deductions: -{breakdown['total_deductions']:.2f}")
+                st.write(f"**Total Deductions: -{breakdown['total_deductions']:.2f}**")
             
             with col3:
                 st.write("**Suggestions & Bonus**")
@@ -1077,6 +1079,10 @@ elif selected == "Finalize Sprint":
             
             st.write("---")
             st.write(f"**Final Calculation:** {breakdown['avg_rating_points']:.2f} (Avg Rating) - {breakdown['total_deductions']:.2f} (Deductions) + {breakdown['bonus_new_movies']:.2f} (Bonus) = **{breakdown['total_points']:.2f} points**")
+            
+            # Show calculation details
+            if breakdown['rated_movies_count'] > 0:
+                st.write(f"*Calculation: ({breakdown['total_rating_sum']:.2f} / {breakdown['rated_movies_count']}) = {breakdown['avg_rating_points']:.2f}*")
     
     # Display Leaderboard
     st.subheader("🏆 Final Sprint Leaderboard")
@@ -1259,8 +1265,8 @@ elif selected == "Finalize Sprint":
                 ws_points.append_row([
                     current_sprint['sprint_id'],
                     user,
-                    round(points, 2),
-                    round(breakdown['avg_rating_points'], 2),
+                    round(points, 2),  # total_points
+                    round(breakdown['avg_rating_points'], 2),  # avg_rating_points (different from total_points)
                     round(breakdown['total_deductions'], 2),
                     round(breakdown['bonus_new_movies'], 2),
                     breakdown['movies_suggested'],
