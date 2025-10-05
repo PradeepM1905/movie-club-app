@@ -70,21 +70,15 @@ def reload_users():
     users_list = []
     users_passwords = {}
     
-    #st.write("Debug: Raw users data from sheet:", users_data)  # Debug line
-    
     for row in users_data:
         uname = row.get("user_name")
         role = row.get("role", "normal").lower()
-        # Try different possible column names for password
         password = row.get("password") or row.get("pass") or row.get("pwd") or ""
         
         if uname:
             users_list.append(uname)
             users_roles[uname] = role
             users_passwords[uname] = password
-            
-            # Debug each user
-            #st.write(f"Debug: Loaded user '{uname}' with password: {'[SET]' if password else '[NOT SET]'}")
     
     return users_list, users_roles, users_passwords
 
@@ -115,9 +109,6 @@ def login(username, password):
     role = users_roles[username]
     stored_password = users_passwords.get(username, "")
     
-    # Debug information (you can remove this after testing)
-    st.write(f"Debug: User '{username}', Role: '{role}', Stored password present: {bool(stored_password)}")
-    
     if role == "admin":
         # Admin uses the secret password
         if password != ADMIN_PASS:
@@ -128,10 +119,6 @@ def login(username, password):
         if not stored_password or stored_password == "":
             st.error("No password set for this user. Please contact admin.")
             return False
-        
-        # For testing: show what's being compared (remove after debugging)
-        st.write(f"Debug: Input password hash: {hash_password(password)}")
-        st.write(f"Debug: Stored password hash: {stored_password}")
         
         if hash_password(password) != stored_password:
             st.error("Incorrect password")
@@ -198,15 +185,14 @@ st.session_state.enable_voting = page_config.get('enable_voting', True)
 st.session_state.enable_rating = page_config.get('enable_rating', True)
 
 # Build menu based on user role and enabled pages
-menu = []
+menu = ["Dashboard"]  # Dashboard first as default
+
 if st.session_state.enable_suggestion or st.session_state.role == "admin":
     menu.append("Suggest Movie")
 if st.session_state.enable_voting or st.session_state.role == "admin":
     menu.append("Voting")
 if st.session_state.enable_rating or st.session_state.role == "admin":
     menu.append("Rate Movies")
-
-menu.append("Dashboard")
 
 if st.session_state.role == "admin":
     menu += ["Admin Panel", "Finalize Sprint"]
@@ -222,9 +208,126 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 # ---------------------------------------
+# PAGE: DASHBOARD
+# ---------------------------------------
+elif selected == "Dashboard":
+    st.header("🎬 Movie Club Dashboard")
+    
+    # Load all data
+    users_data = load_sheet("Users")
+    suggestions = load_sheet("Suggestions")
+    ratings = load_sheet("Ratings")
+    
+    # Convert to DataFrames
+    df_users = pd.DataFrame(users_data)
+    df_suggestions = pd.DataFrame(suggestions) if suggestions else pd.DataFrame()
+    df_ratings = pd.DataFrame(ratings) if ratings else pd.DataFrame()
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Total Members", len(df_users))
+    with col2:
+        st.metric("Movies Suggested", len(df_suggestions) if not df_suggestions.empty else 0)
+    with col3:
+        active_sprint_days = 15  # Default sprint duration
+        st.metric("Sprint Duration", f"{active_sprint_days} days")
+    
+    st.markdown("---")
+    
+    # Leaderboard Section
+    st.subheader("🏆 Leaderboard")
+    
+    if not df_users.empty:
+        # Create leaderboard from Users sheet points
+        leaderboard_data = []
+        for _, user in df_users.iterrows():
+            leaderboard_data.append({
+                "Rank": len(leaderboard_data) + 1,
+                "User": user['user_name'],
+                "Total Points": user.get('points', 0),
+                "Role": user['role']
+            })
+        
+        # Sort by points descending
+        leaderboard_data.sort(key=lambda x: float(x['Total Points']), reverse=True)
+        
+        # Update ranks after sorting
+        for i, item in enumerate(leaderboard_data):
+            item['Rank'] = i + 1
+        
+        df_leaderboard = pd.DataFrame(leaderboard_data)
+        st.dataframe(df_leaderboard, use_container_width=True)
+    else:
+        st.info("No user data available.")
+    
+    st.markdown("---")
+    
+    # Current Sprint Movies Section
+    st.subheader("🎬 Current Sprint Movies & Ratings")
+    
+    if not df_suggestions.empty and not df_ratings.empty:
+        # Calculate average ratings for each movie
+        df_ratings['rating'] = pd.to_numeric(df_ratings['rating'], errors='coerce')
+        
+        # Filter out "did not watch" ratings
+        df_valid_ratings = df_ratings[~df_ratings['did_not_watch']]
+        
+        if not df_valid_ratings.empty:
+            movie_ratings = df_valid_ratings.groupby('movie_name')['rating'].agg(['mean', 'count']).round(2)
+            movie_ratings = movie_ratings.rename(columns={'mean': 'Average Rating', 'count': 'Number of Ratings'})
+            movie_ratings = movie_ratings.sort_values('Average Rating', ascending=False)
+            
+            # Display movies with ratings
+            for movie, ratings in movie_ratings.iterrows():
+                avg_rating = ratings['Average Rating']
+                num_ratings = int(ratings['Number of Ratings'])
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"**{movie}**")
+                with col2:
+                    st.write(f"⭐ {avg_rating}/10 ({num_ratings} ratings)")
+                st.progress(float(avg_rating) / 10)
+        else:
+            st.info("No ratings available for current movies.")
+    elif not df_suggestions.empty:
+        st.info("Movies suggested but no ratings yet.")
+        # Show just the suggested movies
+        for _, movie in df_suggestions.iterrows():
+            st.write(f"• **{movie['movie_name']}** - {movie.get('genre', '')}")
+    else:
+        st.info("No movies suggested for current sprint.")
+    
+    st.markdown("---")
+    
+    # Sprint Countdown Section
+    st.subheader("⏰ Next Sprint Countdown")
+    
+    # Simplified sprint tracking - you can enhance this later
+    sprint_duration = 15
+    days_in_current_sprint = 5  # Example - you can calculate this based on actual dates
+    
+    days_remaining = sprint_duration - days_in_current_sprint
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Days until next sprint", max(0, days_remaining))
+    with col2:
+        if days_remaining > 0:
+            st.write(f"Next sprint starts in **{days_remaining} days**")
+        else:
+            st.success("🎉 Ready for new sprint!")
+    
+    # Progress bar for current sprint
+    sprint_progress = min(100, (days_in_current_sprint / sprint_duration) * 100)
+    st.progress(sprint_progress / 100)
+    st.caption(f"Current sprint progress: {sprint_progress:.1f}%")
+
+# ---------------------------------------
 # PAGE: SUGGEST MOVIE
 # ---------------------------------------
-if selected == "Suggest Movie":
+elif selected == "Suggest Movie":
     if not st.session_state.enable_suggestion and st.session_state.role != "admin":
         st.warning("Suggestion page is currently disabled by admin.")
         st.stop()
@@ -325,25 +428,6 @@ elif selected == "Rate Movies":
                 st.success("✅ Ratings submitted!")
             except Exception as e:
                 st.warning(f"Failed to save ratings: {e}")
-
-# ---------------------------------------
-# PAGE: DASHBOARD
-# ---------------------------------------
-elif selected == "Dashboard":
-    st.header("📊 Movie Ratings Dashboard")
-    ratings = load_sheet("Ratings")
-
-    if not ratings:
-        st.info("No ratings yet.")
-    else:
-        df = pd.DataFrame(ratings)
-        df["rating"] = df["rating"].astype(float)
-        df["did_not_watch"] = df["did_not_watch"].astype(bool)
-
-        st.write("### Average Ratings by Movie")
-        for movie in df["movie_name"].unique():
-            avg = df.loc[~df["did_not_watch"] & (df["movie_name"] == movie), "rating"].mean()
-            st.write(f"🎬 {movie}: **{avg:.2f}**")
 
 # ---------------------------------------
 # PAGE: ADMIN PANEL
