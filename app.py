@@ -137,6 +137,54 @@ def get_current_datetime():
         return datetime.now()
 
 # ---------------------------------------
+# SPRINT MANAGEMENT
+# ---------------------------------------
+@st.cache_data(ttl=120)
+def get_current_sprint():
+    """Get the current active sprint based on date"""
+    try:
+        sprints_data = load_sheet("Sprints")
+        current_date = get_current_date()
+        
+        for sprint in sprints_data:
+            start_date = datetime.strptime(sprint['start_date'], '%Y-%m-%d').date()
+            end_date = datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
+            
+            if start_date <= current_date <= end_date:
+                return sprint
+        
+        # If no active sprint found, return the most recent past sprint or None
+        if sprints_data:
+            # Sort sprints by end_date descending to get the most recent one
+            sorted_sprints = sorted(sprints_data, 
+                                  key=lambda x: datetime.strptime(x['end_date'], '%Y-%m-%d'), 
+                                  reverse=True)
+            return sorted_sprints[0]
+        
+        return None
+    except Exception as e:
+        st.warning(f"Error loading sprints: {e}")
+        return None
+
+def get_sprint_display_info():
+    """Get sprint information for display"""
+    current_sprint = get_current_sprint()
+    if current_sprint:
+        current_date = get_current_date()
+        sprint_end = datetime.strptime(current_sprint['end_date'], '%Y-%m-%d').date()
+        days_remaining = (sprint_end - current_date).days
+        
+        return {
+            'sprint_id': current_sprint['sprint_id'],
+            'description': current_sprint.get('description', ''),
+            'start_date': current_sprint['start_date'],
+            'end_date': current_sprint['end_date'],
+            'days_remaining': max(0, days_remaining),
+            'total_days': (sprint_end - datetime.strptime(current_sprint['start_date'], '%Y-%m-%d').date()).days + 1
+        }
+    return None
+
+# ---------------------------------------
 # LOGIN SYSTEM
 # ---------------------------------------
 if "logged_in" not in st.session_state:
@@ -254,6 +302,7 @@ selected = st.sidebar.radio("📋 Navigation", menu)
 # ---------------------------------------
 testing_enabled, test_date = load_testing_config()
 current_date = get_current_date()
+sprint_info = get_sprint_display_info()
 
 st.sidebar.markdown("---")
 
@@ -263,6 +312,18 @@ if testing_enabled:
     st.sidebar.info("All dates and sprints use the simulated date above")
 else:
     st.sidebar.write(f"📅 **Current Date:** {current_date}")
+
+# Display sprint information
+if sprint_info:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🏃‍♂️ Current Sprint")
+    st.sidebar.write(f"**{sprint_info['sprint_id']}** - {sprint_info['description']}")
+    st.sidebar.write(f"📅 {sprint_info['start_date']} to {sprint_info['end_date']}")
+    st.sidebar.write(f"⏳ **{sprint_info['days_remaining']} days remaining**")
+    
+    # Sprint progress
+    progress = 100 - (sprint_info['days_remaining'] / sprint_info['total_days'] * 100)
+    st.sidebar.progress(min(100, max(0, progress)) / 100)
 
 st.sidebar.write(f"👤 Logged in as: **{st.session_state.username}** ({st.session_state.role})")
 
@@ -274,7 +335,14 @@ if st.sidebar.button("Logout"):
 # PAGE: DASHBOARD
 # ---------------------------------------
 if selected == "Dashboard":
-    st.header("🎬 Movie Club Dashboard")
+    # Display sprint information in header
+    sprint_info = get_sprint_display_info()
+    if sprint_info:
+        st.header(f"🎬 Movie Club Dashboard - {sprint_info['sprint_id']}")
+        st.write(f"**{sprint_info['description']}** | {sprint_info['start_date']} to {sprint_info['end_date']} | {sprint_info['days_remaining']} days remaining")
+    else:
+        st.header("🎬 Movie Club Dashboard")
+        st.warning("No active sprint found. Please check Sprints configuration.")
     
     # Show testing mode indicator
     testing_enabled, test_date = load_testing_config()
@@ -298,8 +366,10 @@ if selected == "Dashboard":
     with col2:
         st.metric("Movies Suggested", len(df_suggestions) if not df_suggestions.empty else 0)
     with col3:
-        active_sprint_days = 15  # Default sprint duration
-        st.metric("Sprint Duration", f"{active_sprint_days} days")
+        if sprint_info:
+            st.metric("Days Remaining", sprint_info['days_remaining'])
+        else:
+            st.metric("Sprint Status", "No Active Sprint")
     
     st.markdown("---")
     
@@ -393,31 +463,24 @@ if selected == "Dashboard":
     st.markdown("---")
     
     # Sprint Countdown Section
-    st.subheader("⏰ Next Sprint Countdown")
+    st.subheader("⏰ Sprint Progress")
     
-    # Enhanced sprint tracking with proper date handling
-    sprint_duration = 15
-    current_date = get_current_date()
-    
-    # Simple sprint calculation based on day of month
-    # You can replace this with more sophisticated sprint tracking
-    day_of_month = current_date.day
-    days_in_sprint = (day_of_month - 1) % sprint_duration + 1
-    days_remaining = max(0, sprint_duration - days_in_sprint)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Days until next sprint", days_remaining)
-    with col2:
-        if days_remaining > 0:
-            st.write(f"Next sprint starts in **{days_remaining} days**")
-        else:
-            st.success("🎉 Ready for new sprint!")
-    
-    # Progress bar for current sprint
-    sprint_progress = min(100, (days_in_sprint / sprint_duration) * 100)
-    st.progress(sprint_progress / 100)
-    st.caption(f"Current sprint progress: {sprint_progress:.1f}% (Day {days_in_sprint} of {sprint_duration})")
+    if sprint_info:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Days until sprint end", sprint_info['days_remaining'])
+        with col2:
+            if sprint_info['days_remaining'] > 0:
+                st.write(f"Sprint ends in **{sprint_info['days_remaining']} days**")
+            else:
+                st.success("🎉 Sprint completed! Ready for finalization!")
+        
+        # Progress bar for current sprint
+        progress = 100 - (sprint_info['days_remaining'] / sprint_info['total_days'] * 100)
+        st.progress(min(100, max(0, progress)) / 100)
+        st.caption(f"Current sprint progress: {progress:.1f}% ({sprint_info['total_days'] - sprint_info['days_remaining']} of {sprint_info['total_days']} days)")
+    else:
+        st.info("No active sprint found. Please check Sprints configuration.")
 
 # ---------------------------------------
 # PAGE: SUGGEST MOVIE
@@ -427,7 +490,16 @@ elif selected == "Suggest Movie":
         st.warning("Suggestion page is currently disabled by admin.")
         st.stop()
 
-    st.header("🎥 Suggest a Movie (Anonymous)")
+    # Display sprint information in header
+    sprint_info = get_sprint_display_info()
+    current_sprint = get_current_sprint()
+    
+    if sprint_info and current_sprint:
+        st.header(f"🎥 Suggest a Movie - {sprint_info['sprint_id']}")
+        st.write(f"**{sprint_info['description']}** | {sprint_info['days_remaining']} days remaining")
+    else:
+        st.header("🎥 Suggest a Movie")
+        st.warning("No active sprint found. Movie suggestions will not be associated with any sprint.")
     
     # Show testing mode indicator
     testing_enabled, test_date = load_testing_config()
@@ -456,8 +528,20 @@ elif selected == "Suggest Movie":
                 ws = sheet.worksheet("Suggestions")
                 # Use current datetime (real or simulated)
                 current_timestamp = get_current_datetime()
-                ws.append_row([user_name, movie_name, genre, description, image_url, str(current_timestamp)])
-                st.success("✅ Movie suggestion submitted anonymously!")
+                # Get current sprint ID or use empty string if no sprint
+                sprint_id = current_sprint['sprint_id'] if current_sprint else ""
+                
+                # Append row with sprint information
+                ws.append_row([
+                    sprint_id,          # sprint
+                    user_name,          # user_name
+                    movie_name,         # movie_name
+                    genre,              # genre
+                    description,        # description
+                    image_url,          # image_url
+                    str(current_timestamp)  # timestamp
+                ])
+                st.success("✅ Movie suggestion submitted!")
             except Exception as e:
                 st.warning(f"Failed to write suggestion: {e}")
 
@@ -469,7 +553,13 @@ elif selected == "Voting":
         st.warning("Voting page is currently disabled by admin.")
         st.stop()
 
-    st.header("🗳️ Voting: Have You Watched This Movie?")
+    # Display sprint information in header
+    sprint_info = get_sprint_display_info()
+    if sprint_info:
+        st.header(f"🗳️ Voting - {sprint_info['sprint_id']}")
+        st.write(f"**Have You Watched These Movies?**")
+    else:
+        st.header("🗳️ Voting")
     
     # Show testing mode indicator
     testing_enabled, test_date = load_testing_config()
@@ -479,8 +569,13 @@ elif selected == "Voting":
     voter_name = st.session_state.username
     movies = load_sheet("Suggestions")
 
+    # Filter movies for current sprint if available
+    current_sprint = get_current_sprint()
+    if current_sprint and movies:
+        movies = [movie for movie in movies if movie.get('sprint') == current_sprint['sprint_id']]
+
     if not movies:
-        st.info("No movie suggestions found.")
+        st.info("No movie suggestions found for current sprint.")
     else:
         votes_data = []
         for movie in movies:
@@ -511,7 +606,16 @@ elif selected == "Rate Movies":
         st.warning("Rating page is currently disabled by admin.")
         st.stop()
 
-    st.header("⭐ Rate Movies")
+    # Display sprint information in header
+    sprint_info = get_sprint_display_info()
+    current_sprint = get_current_sprint()
+    
+    if sprint_info and current_sprint:
+        st.header(f"⭐ Rate Movies - {sprint_info['sprint_id']}")
+        st.write(f"**Rate the movies from current sprint**")
+    else:
+        st.header("⭐ Rate Movies")
+        st.warning("No active sprint found. Ratings may not be associated with any sprint.")
     
     # Show testing mode indicator
     testing_enabled, test_date = load_testing_config()
@@ -521,8 +625,12 @@ elif selected == "Rate Movies":
     rater_name = st.session_state.username
     movies = load_sheet("Suggestions")
 
+    # Filter movies for current sprint if available
+    if current_sprint and movies:
+        movies = [movie for movie in movies if movie.get('sprint') == current_sprint['sprint_id']]
+
     if not movies:
-        st.info("No movies to rate.")
+        st.info("No movies to rate for current sprint.")
     else:
         ratings_data = []
         for movie in movies:
@@ -540,8 +648,34 @@ elif selected == "Rate Movies":
             try:
                 ws = sheet.worksheet("Ratings")
                 current_timestamp = get_current_datetime()
+                # Get current sprint ID or use empty string if no sprint
+                sprint_id = current_sprint['sprint_id'] if current_sprint else ""
+                
                 for movie_name, rating, dnw in ratings_data:
-                    ws.append_row([movie_name, rater_name, rating, dnw, str(current_timestamp)])
+                    # Check if rating already exists for this user and movie in current sprint
+                    existing_ratings = load_sheet("Ratings")
+                    rating_exists = False
+                    
+                    for existing_rating in existing_ratings:
+                        if (existing_rating.get('user_name') == rater_name and 
+                            existing_rating.get('movie_name') == movie_name and 
+                            existing_rating.get('sprint') == sprint_id):
+                            rating_exists = True
+                            break
+                    
+                    if rating_exists:
+                        st.warning(f"Rating already submitted for {movie_name}. Skipping...")
+                    else:
+                        # Append row with sprint information
+                        ws.append_row([
+                            sprint_id,          # sprint
+                            movie_name,         # movie_name
+                            rater_name,         # user_name
+                            rating,             # rating
+                            dnw,                # did_not_watch
+                            str(current_timestamp)  # timestamp
+                        ])
+                
                 st.success("✅ Ratings submitted!")
             except Exception as e:
                 st.warning(f"Failed to save ratings: {e}")
@@ -562,6 +696,21 @@ elif selected == "Admin Panel":
         st.warning(f"🧪 **TESTING MODE ACTIVE** - Current simulated date: {test_date}")
     else:
         st.info(f"📅 **PRODUCTION MODE** - Current date: {get_current_date()}")
+
+    # Show current sprint information
+    sprint_info = get_sprint_display_info()
+    if sprint_info:
+        st.subheader("🏃‍♂️ Current Sprint Information")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Sprint ID", sprint_info['sprint_id'])
+        with col2:
+            st.metric("Days Remaining", sprint_info['days_remaining'])
+        with col3:
+            st.metric("Progress", f"{100 - (sprint_info['days_remaining'] / sprint_info['total_days'] * 100):.1f}%")
+        
+        st.write(f"**Description:** {sprint_info['description']}")
+        st.write(f"**Period:** {sprint_info['start_date']} to {sprint_info['end_date']}")
 
     st.subheader("Testing Configuration")
     
@@ -782,7 +931,16 @@ elif selected == "Finalize Sprint":
         st.warning("Admin access only.")
         st.stop()
 
-    st.header("🏁 Finalize Sprint")
+    # Display sprint information in header
+    sprint_info = get_sprint_display_info()
+    current_sprint = get_current_sprint()
+    
+    if sprint_info and current_sprint:
+        st.header(f"🏁 Finalize Sprint - {sprint_info['sprint_id']}")
+        st.write(f"**{sprint_info['description']}** | Ending on {sprint_info['end_date']}")
+    else:
+        st.header("🏁 Finalize Sprint")
+        st.warning("No active sprint found to finalize.")
     
     # Show testing mode indicator
     testing_enabled, test_date = load_testing_config()
@@ -798,11 +956,22 @@ elif selected == "Finalize Sprint":
     
     st.markdown("---")
     
-    # Load current data
-    suggestions = load_sheet("Suggestions")
-    votes = load_sheet("Voting")
-    ratings = load_sheet("Ratings")
+    # Load current data - filter for current sprint
+    all_suggestions = load_sheet("Suggestions")
+    all_votes = load_sheet("Voting")
+    all_ratings = load_sheet("Ratings")
     users_data = load_sheet("Users")
+    
+    # Filter data for current sprint
+    if current_sprint:
+        suggestions = [s for s in all_suggestions if s.get('sprint') == current_sprint['sprint_id']]
+        # For votes and ratings, we'll use all data since they might not have sprint info
+        votes = all_votes
+        ratings = all_ratings
+    else:
+        suggestions = all_suggestions
+        votes = all_votes
+        ratings = all_ratings
     
     if not suggestions:
         st.warning("No movie suggestions found for this sprint.")
@@ -974,7 +1143,34 @@ elif selected == "Finalize Sprint":
         try:
             # Archive current data (you might want to create archive sheets)
             # For now, we'll just clear the current data for new sprint
-            sheet.worksheet("Suggestions").clear()
+            # Only clear suggestions for the current sprint
+            if current_sprint:
+                # Get all suggestions
+                all_suggestions_data = sheet.worksheet("Suggestions").get_all_records()
+                # Filter out suggestions from the current sprint
+                suggestions_to_keep = [s for s in all_suggestions_data if s.get('sprint') != current_sprint['sprint_id']]
+                
+                # Clear and rewrite the suggestions sheet
+                ws_suggestions = sheet.worksheet("Suggestions")
+                ws_suggestions.clear()
+                # Add headers
+                ws_suggestions.append_row(["sprint", "user_name", "movie_name", "genre", "description", "image_url", "timestamp"])
+                # Add remaining suggestions
+                for suggestion in suggestions_to_keep:
+                    ws_suggestions.append_row([
+                        suggestion.get('sprint', ''),
+                        suggestion.get('user_name', ''),
+                        suggestion.get('movie_name', ''),
+                        suggestion.get('genre', ''),
+                        suggestion.get('description', ''),
+                        suggestion.get('image_url', ''),
+                        suggestion.get('timestamp', '')
+                    ])
+            else:
+                # If no current sprint, clear all suggestions
+                sheet.worksheet("Suggestions").clear()
+            
+            # Clear voting and ratings (these don't have sprint info yet)
             sheet.worksheet("Voting").clear() 
             sheet.worksheet("Ratings").clear()
             
