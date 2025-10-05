@@ -992,330 +992,218 @@ elif selected == "Finalize Sprint":
     with col4:
         st.metric("Active Users", len(df_users))
     
-    # Points Calculation Logic
-    st.subheader("💰 Points Calculation Breakdown")
-    
-    # Initialize points dictionary
-    user_points = {}
-    user_breakdown = {}
-    
-    # Points rules
-    bonus_per_new_movie = 0.5  # Bonus for suggesting a movie no one watched
-    deduction_per_missed_movie = 0.25  # Deduction for each movie not watched
-    
-    # Create a mapping from movie name to suggester
-    movie_to_suggester = {}
-    for _, row in df_suggestions.iterrows():
-        movie_to_suggester[row['movie_name']] = row['user_name']
-    
-    # Calculate points for each user
-    for user in df_users['user_name'].tolist():
-        # 1. Calculate SUM of ratings for movies suggested by this user (only watched movies)
-        user_suggested_movies = df_suggestions[df_suggestions['user_name'] == user]['movie_name'].tolist()
-        
-        total_rating_sum = 0
-        
-        for movie in user_suggested_movies:
-            # Get all ratings for this movie where people actually watched it
-            movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
-            if not movie_ratings.empty:
-                movie_total_rating = movie_ratings['rating'].sum()  # SUM instead of average
-                total_rating_sum += movie_total_rating
-        
-        # 2. Calculate deductions for movies this user did not watch
-        user_not_watched = df_ratings[(df_ratings['user_name'] == user) & (df_ratings['did_not_watch'] == True)]
-        total_deductions = len(user_not_watched) * deduction_per_missed_movie
-        
-        # 3. Calculate bonus for movies suggested that no one watched
-        bonus = 0
-        for movie in user_suggested_movies:
-            # Check if anyone watched this movie (anyone rated it without "did not watch")
-            movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
-            if len(movie_ratings) == 0:
-                bonus += bonus_per_new_movie
-        
-        # 4. Calculate total points (SUM of ratings - deductions + bonus)
-        total_points = total_rating_sum - total_deductions + bonus
-        
-        # Store the breakdown
-        user_breakdown[user] = {
-            "total_rating_sum": total_rating_sum,
-            "movies_suggested": len(user_suggested_movies),
-            "movies_not_watched": len(user_not_watched),
-            "total_deductions": total_deductions,
-            "bonus_new_movies": bonus,
-            "total_points": total_points
-        }
-        user_points[user] = total_points
-    
-    # Display detailed points breakdown
-    st.write("#### Detailed Points Calculation for Each User")
-    for user, breakdown in user_breakdown.items():
-        with st.expander(f"📋 {user}'s Points Breakdown - Total: {breakdown['total_points']:.2f} points"):
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.write("**Rating Points**")
-                st.write(f"Movies Suggested: {breakdown['movies_suggested']}")
-                st.write(f"**Total Rating Points: {breakdown['total_rating_sum']:.2f}**")
-            
-            with col2:
-                st.write("**Deductions**")
-                st.write(f"Movies Not Watched: {breakdown['movies_not_watched']}")
-                st.write(f"**Total Deductions: -{breakdown['total_deductions']:.2f}**")
-            
-            with col3:
-                st.write("**Suggestions & Bonus**")
-                st.write(f"New Movie Bonus: +{breakdown['bonus_new_movies']:.2f}")
-            
-            st.write("---")
-            st.write(f"**Final Calculation:** {breakdown['total_rating_sum']:.2f} (Rating Points) - {breakdown['total_deductions']:.2f} (Deductions) + {breakdown['bonus_new_movies']:.2f} (Bonus) = **{breakdown['total_points']:.2f} points**")
-    
-    # Display Leaderboard
-    st.subheader("🏆 Final Sprint Leaderboard")
-    leaderboard_data = []
-    for user, points in sorted(user_points.items(), key=lambda x: x[1], reverse=True):
-        breakdown = user_breakdown[user]
-        leaderboard_data.append({
-            "Rank": len(leaderboard_data) + 1,
-            "User": user,
-            "Total Points": f"{points:.2f}",
-            "Rating Points": f"{breakdown['total_rating_sum']:.2f}",
-            "Deductions": f"-{breakdown['total_deductions']:.2f}",
-            "Bonus": f"+{breakdown['bonus_new_movies']:.2f}",
-            "Movies Suggested": breakdown['movies_suggested'],
-            "Not Watched": breakdown['movies_not_watched']
-        })
-    
-    df_leaderboard = pd.DataFrame(leaderboard_data)
-    st.dataframe(df_leaderboard, use_container_width=True)
-    
-    # Movie Statistics
-    st.subheader("🎬 Movie Statistics")
-    
-    # Calculate movie averages and find suggesters
-    movie_stats = []
-    for movie in df_suggestions['movie_name'].unique():
-        movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
-        suggester = movie_to_suggester.get(movie, "Unknown")
-        
-        if not movie_ratings.empty:
-            avg_rating = movie_ratings['rating'].mean()
-            total_rating = movie_ratings['rating'].sum()
-            num_ratings = len(movie_ratings)
-            num_not_watched = len(df_ratings[(df_ratings['movie_name'] == movie) & (df_ratings['did_not_watch'] == True)])
-            
-            movie_stats.append({
-                "Movie": movie,
-                "Suggested By": suggester,
-                "Avg Rating": f"{avg_rating:.2f}",
-                "Total Rating": f"{total_rating:.2f}",
-                "Ratings Count": num_ratings,
-                "Not Watched Count": num_not_watched,
-                "Status": "Watched" if num_ratings > 0 else "Not Watched"
-            })
-        else:
-            movie_stats.append({
-                "Movie": movie,
-                "Suggested By": suggester,
-                "Avg Rating": "N/A",
-                "Total Rating": "0.00",
-                "Ratings Count": 0,
-                "Not Watched Count": len(df_ratings[df_ratings['movie_name'] == movie]),
-                "Status": "Not Watched"
-            })
-    
-    df_movie_stats = pd.DataFrame(movie_stats)
-    st.dataframe(df_movie_stats, use_container_width=True)
-    
-    # WhatsApp Message Generation
-    st.subheader("📱 WhatsApp Messages")
-    
-    # Find top 3 winners
-    sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
-    top_3 = sorted_users[:3]
-    
-    # Find best rated movie
-    best_movie = None
-    best_rating = 0
-    best_movie_suggester = ""
-    for movie in df_suggestions['movie_name'].unique():
-        movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
-        if not movie_ratings.empty:
-            avg_rating = movie_ratings['rating'].mean()
-            if avg_rating > best_rating:
-                best_rating = avg_rating
-                best_movie = movie
-                best_movie_suggester = movie_to_suggester.get(movie, "Unknown")
-    
-    # Find movies no one watched
-    unwatched_movies = []
-    for movie in df_suggestions['movie_name'].unique():
-        movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
-        if len(movie_ratings) == 0:
-            suggester = movie_to_suggester.get(movie, "Unknown")
-            unwatched_movies.append((movie, suggester))
-    
-    # Sprint Summary Message
-    sprint_summary = f"""🎬 *MOVIE CLUB SPRINT RESULTS* 🎬
-
-*Sprint:* {current_sprint['sprint_id']} - {current_sprint['description']}
-*Period:* {current_sprint['start_date']} to {current_sprint['end_date']}
-*Finalized on:* {get_current_date()}
-
-*📊 SPRINT STATISTICS:*
-• Total Movies Suggested: {len(df_suggestions)}
-• Total Ratings Submitted: {len(df_ratings)}
-• Active Participants: {len(user_points)}
-• Movies No One Watched: {len(unwatched_movies)}
-
-*🏆 TOP PERFORMERS:*
-"""
-    
-    # Add top 3 winners with emojis
-    medals = ["🥇", "🥈", "🥉"]
-    for i, (user, points) in enumerate(top_3):
-        breakdown = user_breakdown[user]
-        sprint_summary += f"{medals[i]} *{user}:* {points:.2f} points\n"
-        sprint_summary += f"   - Suggested {breakdown['movies_suggested']} movies\n"
-        sprint_summary += f"   - Rating points: {breakdown['total_rating_sum']:.2f}\n"
-        if breakdown['bonus_new_movies'] > 0:
-            sprint_summary += f"   - New movie bonus: +{breakdown['bonus_new_movies']:.2f}\n"
-        sprint_summary += "\n"
-    
-    # Add movie ratings summary
-    sprint_summary += f"*🎬 MOVIE RATINGS SUMMARY:*\n"
-    
-    # Add top 3 rated movies
-    rated_movies = [m for m in movie_stats if m['Status'] == 'Watched']
-    rated_movies.sort(key=lambda x: float(x['Avg Rating']), reverse=True)
-    
-    for i, movie in enumerate(rated_movies[:3]):  # Top 3 movies
-        sprint_summary += f"• *{movie['Movie']}* - ⭐ {movie['Avg Rating']}/10 (by {movie['Suggested By']})\n"
-    
-    # Add unwatched movies if any
-    if unwatched_movies:
-        sprint_summary += f"\n*🚫 MOVIES NO ONE WATCHED (Bonus given):*\n"
-        for movie, suggester in unwatched_movies:
-            sprint_summary += f"• {movie} (suggested by {suggester})\n"
-    
-    # Add fun facts
-    sprint_summary += f"\n*🎉 FUN FACTS:*\n"
-    if best_movie:
-        sprint_summary += f"• Highest Rated: *{best_movie}* ({best_rating:.2f}/10 ⭐) by {best_movie_suggester}\n"
-    
-    most_active_suggester = max(user_breakdown.items(), key=lambda x: x[1]['movies_suggested'])
-    sprint_summary += f"• Most Active Suggester: *{most_active_suggester[0]}* ({most_active_suggester[1]['movies_suggested']} movies suggested)\n"
-    
-    sprint_summary += f"\n*📈 PARTICIPATION RATE:* {len([u for u in user_breakdown.values() if u['movies_suggested'] > 0])}/{len(user_points)} users suggested movies\n"
-    
-    sprint_summary += "\nGreat job everyone! 🎉 See you next sprint! 👋"
-    
-    # Display messages
-    st.text_area("📋 Sprint Summary Message (Copy for WhatsApp)", sprint_summary, height=500)
-    
-    # Compact version for quick sharing
-    compact_summary = f"""🎬 *MOVIE CLUB RESULTS - {current_sprint['sprint_id']}* 🎬
-
-🏆 WINNERS:
-{medals[0]} {top_3[0][0]}: {top_3[0][1]:.2f} pts
-{medals[1]} {top_3[1][0]}: {top_3[1][1]:.2f} pts  
-{medals[2]} {top_3[2][0]}: {top_3[2][1]:.2f} pts
-
-⭐ TOP MOVIES:
-"""
-    for i, movie in enumerate(rated_movies[:3]):
-        compact_summary += f"{i+1}. {movie['Movie']} - {movie['Avg Rating']}/10\n"
-    
-    compact_summary += f"\n📊 {len(df_suggestions)} movies, {len(user_points)} participants"
-    compact_summary += f"\n\nGreat job! 🎉 Next sprint coming soon! 👋"
-    
-    st.text_area("📱 Compact Message (Quick Share)", compact_summary, height=200)
-    
-    # Finalize button
+    # Calculate button
     st.markdown("---")
-    st.warning("⚠️ This will calculate and save points for this sprint. No data will be purged.")
+    st.subheader("💰 Calculate Points")
     
-    if st.button("🚀 Calculate & Save Sprint Points"):
-        try:
-            # Update Points sheet (sprint-wise points)
-            try:
-                ws_points = sheet.worksheet("Points")
-            except:
-                ws_points = sheet.add_worksheet(title="Points", rows="1000", cols="10")
-                # Add headers
-                ws_points.append_row([
-                    "sprint", "user_name", "total_points", "rating_points", 
-                    "deductions", "bonus", "movies_suggested", "finalized_date"
-                ])
+    if st.button("🚀 Calculate & Save Sprint Points", type="primary"):
+        # Points Calculation Logic
+        user_points = {}
+        user_breakdown = {}
+        movie_points_data = []
+        
+        # Points rules
+        bonus_per_new_movie = 0.5
+        deduction_per_missed_movie = 0.25
+        
+        # Create a mapping from movie name to suggester
+        movie_to_suggester = {}
+        for _, row in df_suggestions.iterrows():
+            movie_to_suggester[row['movie_name']] = row['user_name']
+        
+        # Calculate points for each user
+        for user in df_users['user_name'].tolist():
+            # 1. Calculate AVERAGE rating for movies suggested by this user
+            user_suggested_movies = df_suggestions[df_suggestions['user_name'] == user]['movie_name'].tolist()
             
-            # Save individual sprint results to Points sheet
-            for user, points in user_points.items():
-                breakdown = user_breakdown[user]
-                ws_points.append_row([
-                    current_sprint['sprint_id'],
-                    user,
-                    round(points, 2),  # total_points
-                    round(breakdown['total_rating_sum'], 2),  # rating_points (SUM of ratings)
-                    round(breakdown['total_deductions'], 2),
-                    round(breakdown['bonus_new_movies'], 2),
-                    breakdown['movies_suggested'],
-                    str(get_current_date())
-                ])
+            total_avg_rating = 0
+            rated_movies_count = 0
             
-            # Update Users sheet with total accumulated points
-            ws_users = sheet.worksheet("Users")
-            users_records = ws_users.get_all_records()
+            # Calculate average for each suggested movie
+            for movie in user_suggested_movies:
+                movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
+                if not movie_ratings.empty:
+                    movie_avg_rating = movie_ratings['rating'].mean()
+                    total_avg_rating += movie_avg_rating
+                    rated_movies_count += 1
+                    
+                    # Store movie-level data
+                    movie_points_data.append({
+                        "Movie": movie,
+                        "User": user,
+                        "Avg Rating": movie_avg_rating,
+                        "Rating Point": movie_avg_rating,  # Same as avg rating for calculation
+                        "Deduction": 0,
+                        "Bonus": 0,
+                        "Final Total": movie_avg_rating
+                    })
             
-            # Create a mapping of current points for each user with proper error handling
-            current_user_points = {}
-            for user_record in users_records:
-                user_name = user_record['user_name']
-                points_value = user_record.get('points', '0')
-                
-                # Safe conversion from string to float
-                try:
-                    if points_value == '' or points_value is None:
-                        current_points = 0.0
-                    else:
-                        current_points = float(points_value)
-                except (ValueError, TypeError):
-                    current_points = 0.0
-                
-                current_user_points[user_name] = current_points
+            # Calculate overall average rating
+            avg_rating_points = total_avg_rating / rated_movies_count if rated_movies_count > 0 else 0
             
-            # Update points for each user - CORRECT COLUMN ORDER
-            # Users sheet columns: user_name, role, password, points
-            for i, user_record in enumerate(users_records):
-                user_name = user_record['user_name']
-                if user_name in user_points:
-                    current_points = current_user_points.get(user_name, 0.0)
-                    new_points = current_points + user_points[user_name]
-                    # Update points in the Users sheet (column 4 - points column)
-                    # Columns: 1=user_name, 2=role, 3=password, 4=points
-                    ws_users.update_cell(i + 2, 4, round(new_points, 2))
+            # 2. Calculate deductions
+            user_not_watched = df_ratings[(df_ratings['user_name'] == user) & (df_ratings['did_not_watch'] == True)]
+            total_deductions = len(user_not_watched) * deduction_per_missed_movie
             
-            st.success("✅ Sprint points calculated and saved successfully!")
-            st.balloons()
+            # 3. Calculate bonus
+            bonus = 0
+            for movie in user_suggested_movies:
+                movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
+                if len(movie_ratings) == 0:
+                    bonus += bonus_per_new_movie
+                    # Add bonus entry to movie data
+                    movie_points_data.append({
+                        "Movie": movie,
+                        "User": user,
+                        "Avg Rating": 0,
+                        "Rating Point": 0,
+                        "Deduction": 0,
+                        "Bonus": bonus_per_new_movie,
+                        "Final Total": bonus_per_new_movie
+                    })
             
-            # Show summary of updated points
-            st.subheader("📈 Points Summary")
-            points_data = []
-            for user, sprint_points in sorted(user_points.items(), key=lambda x: x[1], reverse=True):
-                old_total = current_user_points.get(user, 0.0)
-                new_total = old_total + sprint_points
-                points_data.append({
+            # 4. Add deductions entry
+            if total_deductions > 0:
+                movie_points_data.append({
+                    "Movie": "Not Watched Penalty",
                     "User": user,
-                    "Sprint Points": f"{sprint_points:.2f}",
-                    "Previous Total": f"{old_total:.2f}",
-                    "New Total": f"{new_total:.2f}"
+                    "Avg Rating": 0,
+                    "Rating Point": 0,
+                    "Deduction": -total_deductions,
+                    "Bonus": 0,
+                    "Final Total": -total_deductions
                 })
             
-            st.dataframe(pd.DataFrame(points_data), use_container_width=True)
+            # 5. Calculate final total (Average rating - deductions + bonus)
+            total_points = avg_rating_points - total_deductions + bonus
             
-            # Show where data was saved
-            st.info(f"📊 **Data Saved To:**\n- **Points Sheet:** Individual sprint performance for {current_sprint['sprint_id']}\n- **Users Sheet:** Updated total points for all users")
-            
-        except Exception as e:
-            st.error(f"❌ Error saving sprint points: {e}")
-            st.error("Please check if the Users sheet has the correct structure: user_name, role, password, points")
+            # Store user breakdown
+            user_breakdown[user] = {
+                "avg_rating_points": avg_rating_points,
+                "total_deductions": total_deductions,
+                "bonus_new_movies": bonus,
+                "total_points": total_points,
+                "movies_suggested": len(user_suggested_movies)
+            }
+            user_points[user] = total_points
+        
+        # Save to Points sheet
+        try:
+            ws_points = sheet.worksheet("Points")
+        except:
+            ws_points = sheet.add_worksheet(title="Points", rows="1000", cols="10")
+            ws_points.append_row(["sprint", "user_name", "total_points", "avg_rating_points", "deductions", "bonus", "movies_suggested", "finalized_date"])
+        
+        # Save individual sprint results
+        for user, points in user_points.items():
+            breakdown = user_breakdown[user]
+            ws_points.append_row([
+                current_sprint['sprint_id'],
+                user,
+                round(points, 2),
+                round(breakdown['avg_rating_points'], 2),
+                round(breakdown['total_deductions'], 2),
+                round(breakdown['bonus_new_movies'], 2),
+                breakdown['movies_suggested'],
+                str(get_current_date())
+            ])
+        
+        # Update Users sheet
+        ws_users = sheet.worksheet("Users")
+        users_records = ws_users.get_all_records()
+        
+        current_user_points = {}
+        for user_record in users_records:
+            user_name = user_record['user_name']
+            points_value = user_record.get('points', '0')
+            try:
+                current_user_points[user_name] = float(points_value) if points_value not in ['', None] else 0.0
+            except (ValueError, TypeError):
+                current_user_points[user_name] = 0.0
+        
+        # Update points in Users sheet (column 4)
+        for i, user_record in enumerate(users_records):
+            user_name = user_record['user_name']
+            if user_name in user_points:
+                current_points = current_user_points.get(user_name, 0.0)
+                new_points = current_points + user_points[user_name]
+                ws_users.update_cell(i + 2, 4, round(new_points, 2))
+        
+        st.success("✅ Sprint points calculated and saved successfully!")
+        
+        # Display Point Info Table
+        st.markdown("---")
+        st.subheader("📋 Point Info")
+        
+        df_movie_points = pd.DataFrame(movie_points_data)
+        st.dataframe(df_movie_points, use_container_width=True)
+        
+        # WhatsApp Messages Section
+        st.markdown("---")
+        st.subheader("📱 WhatsApp Messages")
+        
+        # Message 1: Current Sprint Average Ratings
+        message1 = f"""🎥 {current_sprint['sprint_id']} Rating 🎥
+━━━━━━━━━━━━━━
+"""
+        # Sort users by average rating points (highest first)
+        sorted_by_avg = sorted(user_breakdown.items(), key=lambda x: x[1]['avg_rating_points'], reverse=True)
+        for user, breakdown in sorted_by_avg:
+            if breakdown['avg_rating_points'] > 0:  # Only include users with ratings
+                message1 += f"🍿 {user}: {breakdown['avg_rating_points']:.3f}\n"
+        
+        message1 += "━━━━━━━━━━━━━━"
+        
+        # Message 2: Total Points after this sprint
+        message2 = f"🏆 *Points after {current_sprint['sprint_id']} Sprint* 🏆\n━━━━━━━━━━━━━━\n"
+        
+        # Get current total points from Users sheet
+        current_totals = {}
+        for user_record in users_records:
+            user_name = user_record['user_name']
+            points_value = user_record.get('points', '0')
+            try:
+                current_totals[user_name] = float(points_value) if points_value not in ['', None] else 0.0
+            except (ValueError, TypeError):
+                current_totals[user_name] = 0.0
+        
+        # Update with new points
+        for user, sprint_points in user_points.items():
+            if user in current_totals:
+                current_totals[user] += sprint_points
+        
+        # Sort by total points (highest first)
+        sorted_by_total = sorted(current_totals.items(), key=lambda x: x[1], reverse=True)
+        
+        for user, total in sorted_by_total:
+            if total > 0:  # Only include users with points
+                message2 += f"👤 {user.ljust(12)}:{total:.3f}\n"
+        
+        message2 += "━━━━━━━━━━━━━━"
+        
+        # Display messages in two columns
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Current Sprint Ratings**")
+            st.code(message1, language=None)
+            if st.button("📋 Copy Rating Message", key="copy_rating"):
+                st.session_state.copied_text = message1
+                st.success("✅ Rating message copied to clipboard!")
+        
+        with col2:
+            st.write("**Total Points Leaderboard**")
+            st.code(message2, language=None)
+            if st.button("📋 Copy Points Message", key="copy_points"):
+                st.session_state.copied_text = message2
+                st.success("✅ Points message copied to clipboard!")
+        
+        # JavaScript for clipboard copy
+        if 'copied_text' in st.session_state:
+            st.markdown(f"""
+            <script>
+            navigator.clipboard.writeText(`{st.session_state.copied_text}`);
+            </script>
+            """, unsafe_allow_html=True)
+            # Clear after use
+            del st.session_state.copied_text
