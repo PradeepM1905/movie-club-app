@@ -1016,7 +1016,7 @@ elif selected == "Finalize Sprint":
             # Get movies suggested by this user
             user_suggested_movies = df_suggestions[df_suggestions['user_name'] == user]['movie_name'].tolist()
             
-            # Calculate deductions for movies this user did not watch
+            # Calculate total deductions for this user
             user_not_watched = df_ratings[(df_ratings['user_name'] == user) & (df_ratings['did_not_watch'] == True)]
             total_deductions = len(user_not_watched) * deduction_per_missed_movie
             
@@ -1032,6 +1032,9 @@ elif selected == "Finalize Sprint":
             # For each movie suggested by the user, calculate points
             user_total_points = 0
             
+            # If user suggested multiple movies, distribute deductions evenly
+            deduction_per_movie = total_deductions / len(user_suggested_movies) if user_suggested_movies else 0
+            
             for movie in user_suggested_movies:
                 # Get all ratings for this movie where people actually watched it
                 movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
@@ -1043,13 +1046,14 @@ elif selected == "Finalize Sprint":
                     total_point = movie_ratings['rating'].sum()
                     average_point = movie_ratings['rating'].mean()
                 
-                # Calculate deduction for this specific movie (proportional)
-                movie_deduction = 0
+                # Calculate deduction for this specific movie (distributed evenly)
+                movie_deduction = -deduction_per_movie  # Negative because it's a deduction
+                
                 # Calculate bonus for this specific movie
                 movie_bonus = bonus_per_new_movie if movie in unwatched_suggestions else 0
                 
                 # Final total for this movie
-                final_total = average_point - movie_deduction + movie_bonus
+                final_total = average_point + movie_deduction + movie_bonus
                 
                 # Add to user's total points
                 user_total_points += final_total
@@ -1064,21 +1068,6 @@ elif selected == "Finalize Sprint":
                     "Bonus": round(movie_bonus, 3),
                     "Final Total": round(final_total, 3)
                 })
-            
-            # Now add the deductions row (spread across all user's movies)
-            if total_deductions > 0 and len(user_suggested_movies) > 0:
-                # Add deductions to the first movie (or distribute as needed)
-                # For simplicity, we'll add it as a separate row but you can modify to distribute
-                point_info_data.append({
-                    "Movie": "Deductions",
-                    "User": user,
-                    "Total Point": 0,
-                    "Average Point": 0,
-                    "Deduction": round(-total_deductions, 3),
-                    "Bonus": 0,
-                    "Final Total": round(-total_deductions, 3)
-                })
-                user_total_points -= total_deductions
             
             # Store user breakdown
             user_breakdown[user] = {
