@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import gspread
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import pandas as pd
 import cloudinary
 import cloudinary.uploader
@@ -88,6 +88,28 @@ def reload_users():
 def hash_password(password):
     """Simple password hashing for basic security"""
     return hashlib.sha256(password.encode()).hexdigest()
+
+# ---------------------------------------
+# TESTING MODE & DATE SIMULATION
+# ---------------------------------------
+if "testing_mode" not in st.session_state:
+    st.session_state.testing_mode = False
+if "test_date" not in st.session_state:
+    st.session_state.test_date = date.today()
+
+def get_current_date():
+    """Get current date - either real or simulated for testing"""
+    if st.session_state.testing_mode:
+        return st.session_state.test_date
+    else:
+        return date.today()
+
+def get_current_datetime():
+    """Get current datetime - either real or simulated for testing"""
+    if st.session_state.testing_mode:
+        return datetime.combine(st.session_state.test_date, datetime.min.time())
+    else:
+        return datetime.now()
 
 # ---------------------------------------
 # LOGIN SYSTEM
@@ -202,7 +224,69 @@ if not menu:
 
 selected = st.sidebar.radio("📋 Navigation", menu)
 
+# ---------------------------------------
+# TESTING MODE CONTROLS (Admin only)
+# ---------------------------------------
+if st.session_state.role == "admin":
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🧪 Testing Mode")
+    
+    # Toggle testing mode
+    testing_mode = st.sidebar.checkbox(
+        "Enable Testing Mode", 
+        value=st.session_state.testing_mode,
+        help="Enable to simulate different dates for testing sprints"
+    )
+    
+    if testing_mode != st.session_state.testing_mode:
+        st.session_state.testing_mode = testing_mode
+        st.cache_data.clear()
+        if testing_mode:
+            st.sidebar.success("✅ Testing mode enabled")
+        else:
+            st.sidebar.success("✅ Testing mode disabled")
+    
+    # Date picker (only show when testing mode is enabled)
+    if st.session_state.testing_mode:
+        test_date = st.sidebar.date_input(
+            "Simulate Current Date",
+            value=st.session_state.test_date,
+            key="date_picker"
+        )
+        
+        if test_date != st.session_state.test_date:
+            st.session_state.test_date = test_date
+            st.sidebar.success(f"✅ Test date set to: {test_date}")
+            st.cache_data.clear()
+        
+        # Quick date navigation buttons
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            if st.button("◀️ -1 Day"):
+                st.session_state.test_date -= timedelta(days=1)
+                st.cache_data.clear()
+                st.rerun()
+        with col2:
+            if st.button("+1 Day ▶️"):
+                st.session_state.test_date += timedelta(days=1)
+                st.cache_data.clear()
+                st.rerun()
+        
+        # Reset to today button
+        if st.button("🔄 Reset to Today"):
+            st.session_state.test_date = date.today()
+            st.cache_data.clear()
+            st.rerun()
+
+# Display current date info
+current_date = get_current_date()
+if st.session_state.testing_mode:
+    st.sidebar.write(f"📅 **Current Date:** {current_date} 🧪")
+else:
+    st.sidebar.write(f"📅 **Current Date:** {current_date}")
+
 st.sidebar.write(f"👤 Logged in as: **{st.session_state.username}** ({st.session_state.role})")
+
 if st.sidebar.button("Logout"):
     st.session_state.clear()
     st.rerun()
@@ -212,6 +296,10 @@ if st.sidebar.button("Logout"):
 # ---------------------------------------
 elif selected == "Dashboard":
     st.header("🎬 Movie Club Dashboard")
+    
+    # Show testing mode indicator
+    if st.session_state.testing_mode:
+        st.warning("🧪 **Testing Mode Active** - Using simulated date for all operations")
     
     # Load all data
     users_data = load_sheet("Users")
@@ -327,11 +415,15 @@ elif selected == "Dashboard":
     # Sprint Countdown Section
     st.subheader("⏰ Next Sprint Countdown")
     
-    # Simplified sprint tracking - you can enhance this later
+    # Enhanced sprint tracking with proper date handling
     sprint_duration = 15
-    days_in_current_sprint = 5  # Example - you can calculate this based on actual dates
+    current_date = get_current_date()
     
-    days_remaining = max(0, sprint_duration - days_in_current_sprint)
+    # Simple sprint calculation based on day of month
+    # You can replace this with more sophisticated sprint tracking
+    day_of_month = current_date.day
+    days_in_sprint = (day_of_month - 1) % sprint_duration + 1
+    days_remaining = max(0, sprint_duration - days_in_sprint)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -343,10 +435,9 @@ elif selected == "Dashboard":
             st.success("🎉 Ready for new sprint!")
     
     # Progress bar for current sprint
-    sprint_progress = min(100, (days_in_current_sprint / sprint_duration) * 100)
+    sprint_progress = min(100, (days_in_sprint / sprint_duration) * 100)
     st.progress(sprint_progress / 100)
-    st.caption(f"Current sprint progress: {sprint_progress:.1f}%")
-    
+    st.caption(f"Current sprint progress: {sprint_progress:.1f}% (Day {days_in_sprint} of {sprint_duration})")
 
 # ---------------------------------------
 # PAGE: SUGGEST MOVIE
@@ -357,6 +448,11 @@ elif selected == "Suggest Movie":
         st.stop()
 
     st.header("🎥 Suggest a Movie (Anonymous)")
+    
+    # Show testing mode indicator
+    if st.session_state.testing_mode:
+        st.info(f"🧪 Testing Mode: Using date {get_current_date()}")
+    
     user_name = st.session_state.username
     movie_name = st.text_input("Movie Name")
     genre = st.text_input("Genre")
@@ -377,7 +473,9 @@ elif selected == "Suggest Movie":
 
             try:
                 ws = sheet.worksheet("Suggestions")
-                ws.append_row([user_name, movie_name, genre, description, image_url, str(datetime.now())])
+                # Use current datetime (real or simulated)
+                current_timestamp = get_current_datetime()
+                ws.append_row([user_name, movie_name, genre, description, image_url, str(current_timestamp)])
                 st.success("✅ Movie suggestion submitted anonymously!")
             except Exception as e:
                 st.warning(f"Failed to write suggestion: {e}")
@@ -391,6 +489,11 @@ elif selected == "Voting":
         st.stop()
 
     st.header("🗳️ Voting: Have You Watched This Movie?")
+    
+    # Show testing mode indicator
+    if st.session_state.testing_mode:
+        st.info(f"🧪 Testing Mode: Using date {get_current_date()}")
+    
     voter_name = st.session_state.username
     movies = load_sheet("Suggestions")
 
@@ -411,8 +514,9 @@ elif selected == "Voting":
         if st.button("Submit Votes"):
             try:
                 ws = sheet.worksheet("Voting")
+                current_timestamp = get_current_datetime()
                 for movie_name, watched in votes_data:
-                    ws.append_row([movie_name, voter_name, watched, str(datetime.now())])
+                    ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
                 st.success("✅ Votes submitted!")
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
@@ -426,6 +530,11 @@ elif selected == "Rate Movies":
         st.stop()
 
     st.header("⭐ Rate Movies")
+    
+    # Show testing mode indicator
+    if st.session_state.testing_mode:
+        st.info(f"🧪 Testing Mode: Using date {get_current_date()}")
+    
     rater_name = st.session_state.username
     movies = load_sheet("Suggestions")
 
@@ -447,8 +556,9 @@ elif selected == "Rate Movies":
         if st.button("Submit Ratings"):
             try:
                 ws = sheet.worksheet("Ratings")
+                current_timestamp = get_current_datetime()
                 for movie_name, rating, dnw in ratings_data:
-                    ws.append_row([movie_name, rater_name, rating, dnw, str(datetime.now())])
+                    ws.append_row([movie_name, rater_name, rating, dnw, str(current_timestamp)])
                 st.success("✅ Ratings submitted!")
             except Exception as e:
                 st.warning(f"Failed to save ratings: {e}")
@@ -462,6 +572,12 @@ elif selected == "Admin Panel":
         st.stop()
 
     st.header("⚙️ Admin Panel")
+
+    # Show testing mode status
+    if st.session_state.testing_mode:
+        st.warning(f"🧪 **Testing Mode Active** - Current simulated date: {get_current_date()}")
+    else:
+        st.info(f"📅 **Production Mode** - Current date: {get_current_date()}")
 
     st.subheader("Page Control")
     # Use callbacks to save changes immediately
@@ -573,10 +689,14 @@ elif selected == "Finalize Sprint":
 
     st.header("🏁 Finalize Sprint")
     
+    # Show testing mode indicator
+    if st.session_state.testing_mode:
+        st.warning(f"🧪 Testing Mode: Using date {get_current_date()}")
+    
     # Sprint configuration
     col1, col2 = st.columns(2)
     with col1:
-        sprint_name = st.text_input("Sprint Name", value=f"Sprint_{datetime.now().strftime('%Y%m%d')}")
+        sprint_name = st.text_input("Sprint Name", value=f"Sprint_{get_current_date().strftime('%Y%m%d')}")
     with col2:
         sprint_days = st.number_input("Sprint Duration (days)", min_value=1, value=15)
     
@@ -721,6 +841,7 @@ elif selected == "Finalize Sprint":
 
 *Sprint:* {sprint_name}
 *Duration:* {sprint_days} days
+*End Date:* {get_current_date()}
 
 *📊 Statistics:*
 • Movies Suggested: {len(df_suggestions)}
