@@ -239,18 +239,25 @@ elif selected == "Dashboard":
     st.subheader("🏆 Leaderboard")
     
     if not df_users.empty:
-        # Create leaderboard from Users sheet points
+        # Create leaderboard from Users sheet points with proper error handling
         leaderboard_data = []
         for _, user in df_users.iterrows():
+            # Safely handle points conversion
+            points = user.get('points', 0)
+            try:
+                points_float = float(points) if points != '' and points is not None else 0.0
+            except (ValueError, TypeError):
+                points_float = 0.0
+            
             leaderboard_data.append({
                 "Rank": len(leaderboard_data) + 1,
                 "User": user['user_name'],
-                "Total Points": user.get('points', 0),
+                "Total Points": points_float,
                 "Role": user['role']
             })
         
-        # Sort by points descending
-        leaderboard_data.sort(key=lambda x: float(x['Total Points']), reverse=True)
+        # Sort by points descending with safe comparison
+        leaderboard_data.sort(key=lambda x: x['Total Points'], reverse=True)
         
         # Update ranks after sorting
         for i, item in enumerate(leaderboard_data):
@@ -267,30 +274,46 @@ elif selected == "Dashboard":
     st.subheader("🎬 Current Sprint Movies & Ratings")
     
     if not df_suggestions.empty and not df_ratings.empty:
-        # Calculate average ratings for each movie
-        df_ratings['rating'] = pd.to_numeric(df_ratings['rating'], errors='coerce')
-        
-        # Filter out "did not watch" ratings
-        df_valid_ratings = df_ratings[~df_ratings['did_not_watch']]
-        
-        if not df_valid_ratings.empty:
-            movie_ratings = df_valid_ratings.groupby('movie_name')['rating'].agg(['mean', 'count']).round(2)
-            movie_ratings = movie_ratings.rename(columns={'mean': 'Average Rating', 'count': 'Number of Ratings'})
-            movie_ratings = movie_ratings.sort_values('Average Rating', ascending=False)
+        # Calculate average ratings for each movie with error handling
+        try:
+            df_ratings['rating'] = pd.to_numeric(df_ratings['rating'], errors='coerce')
             
-            # Display movies with ratings
-            for movie, ratings in movie_ratings.iterrows():
-                avg_rating = ratings['Average Rating']
-                num_ratings = int(ratings['Number of Ratings'])
+            # Filter out "did not watch" ratings - handle different data types
+            if 'did_not_watch' in df_ratings.columns:
+                # Convert did_not_watch to boolean safely
+                df_ratings['did_not_watch'] = df_ratings['did_not_watch'].astype(str).str.lower().isin(['true', 'yes', '1', 'y', 't'])
+                df_valid_ratings = df_ratings[~df_ratings['did_not_watch']]
+            else:
+                df_valid_ratings = df_ratings
+            
+            if not df_valid_ratings.empty:
+                movie_ratings = df_valid_ratings.groupby('movie_name')['rating'].agg(['mean', 'count']).round(2)
+                movie_ratings = movie_ratings.rename(columns={'mean': 'Average Rating', 'count': 'Number of Ratings'})
+                movie_ratings = movie_ratings.sort_values('Average Rating', ascending=False)
                 
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"**{movie}**")
-                with col2:
-                    st.write(f"⭐ {avg_rating}/10 ({num_ratings} ratings)")
-                st.progress(float(avg_rating) / 10)
-        else:
-            st.info("No ratings available for current movies.")
+                # Display movies with ratings
+                for movie, ratings in movie_ratings.iterrows():
+                    avg_rating = ratings['Average Rating']
+                    num_ratings = int(ratings['Number of Ratings'])
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"**{movie}**")
+                    with col2:
+                        st.write(f"⭐ {avg_rating}/10 ({num_ratings} ratings)")
+                    
+                    # Safe progress bar
+                    progress_value = float(avg_rating) / 10.0
+                    st.progress(min(1.0, max(0.0, progress_value)))
+            else:
+                st.info("No valid ratings available for current movies.")
+                
+        except Exception as e:
+            st.error(f"Error processing ratings: {e}")
+            st.info("Showing suggested movies without ratings:")
+            for _, movie in df_suggestions.iterrows():
+                st.write(f"• **{movie['movie_name']}** - {movie.get('genre', '')}")
+                
     elif not df_suggestions.empty:
         st.info("Movies suggested but no ratings yet.")
         # Show just the suggested movies
@@ -308,11 +331,11 @@ elif selected == "Dashboard":
     sprint_duration = 15
     days_in_current_sprint = 5  # Example - you can calculate this based on actual dates
     
-    days_remaining = sprint_duration - days_in_current_sprint
+    days_remaining = max(0, sprint_duration - days_in_current_sprint)
     
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Days until next sprint", max(0, days_remaining))
+        st.metric("Days until next sprint", days_remaining)
     with col2:
         if days_remaining > 0:
             st.write(f"Next sprint starts in **{days_remaining} days**")
@@ -323,6 +346,7 @@ elif selected == "Dashboard":
     sprint_progress = min(100, (days_in_current_sprint / sprint_duration) * 100)
     st.progress(sprint_progress / 100)
     st.caption(f"Current sprint progress: {sprint_progress:.1f}%")
+    
 
 # ---------------------------------------
 # PAGE: SUGGEST MOVIE
