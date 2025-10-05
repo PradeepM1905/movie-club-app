@@ -1277,19 +1277,31 @@ elif selected == "Finalize Sprint":
             ws_users = sheet.worksheet("Users")
             users_records = ws_users.get_all_records()
             
-            # Create a mapping of current points for each user
+            # Create a mapping of current points for each user with proper error handling
             current_user_points = {}
             for user_record in users_records:
-                current_user_points[user_record['user_name']] = float(user_record.get('points', 0))
+                user_name = user_record['user_name']
+                points_value = user_record.get('points', '0')
+                
+                # Safe conversion from string to float
+                try:
+                    if points_value == '' or points_value is None:
+                        current_points = 0.0
+                    else:
+                        current_points = float(points_value)
+                except (ValueError, TypeError):
+                    current_points = 0.0
+                
+                current_user_points[user_name] = current_points
             
             # Update points for each user
             for i, user_record in enumerate(users_records):
                 user_name = user_record['user_name']
                 if user_name in user_points:
-                    current_points = current_user_points[user_name]
+                    current_points = current_user_points.get(user_name, 0.0)
                     new_points = current_points + user_points[user_name]
-                    # Update points in the Users sheet (column 3)
-                    ws_users.update_cell(i + 2, 3, round(new_points, 2))
+                    # Update points in the Users sheet (column 4 - points column)
+                    ws_users.update_cell(i + 2, 4, round(new_points, 2))
             
             st.success("✅ Sprint points calculated and saved successfully!")
             st.balloons()
@@ -1298,7 +1310,7 @@ elif selected == "Finalize Sprint":
             st.subheader("📈 Points Summary")
             points_data = []
             for user, sprint_points in sorted(user_points.items(), key=lambda x: x[1], reverse=True):
-                old_total = current_user_points.get(user, 0)
+                old_total = current_user_points.get(user, 0.0)
                 new_total = old_total + sprint_points
                 points_data.append({
                     "User": user,
@@ -1314,3 +1326,4 @@ elif selected == "Finalize Sprint":
             
         except Exception as e:
             st.error(f"❌ Error saving sprint points: {e}")
+            st.error("Please check if the Users sheet has the correct structure with 'points' column")
