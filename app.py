@@ -90,24 +90,49 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # ---------------------------------------
-# TESTING MODE & DATE SIMULATION
+# TESTING MODE FROM GOOGLE SHEETS
 # ---------------------------------------
-if "testing_mode" not in st.session_state:
-    st.session_state.testing_mode = False
-if "test_date" not in st.session_state:
-    st.session_state.test_date = date.today()
+@st.cache_data(ttl=60)
+def load_testing_config():
+    """Load testing configuration from Google Sheets"""
+    try:
+        testing_data = load_sheet("Testing")
+        if testing_data and len(testing_data) > 0:
+            # Get the first row which should contain the test date
+            test_config = testing_data[0]
+            test_date_str = test_config.get('date', '').strip()
+            
+            if test_date_str:
+                try:
+                    # Parse date from string (assuming YYYY-MM-DD format)
+                    test_date = datetime.strptime(test_date_str, '%Y-%m-%d').date()
+                    return True, test_date
+                except ValueError:
+                    # Try other common date formats
+                    try:
+                        test_date = datetime.strptime(test_date_str, '%d/%m/%Y').date()
+                        return True, test_date
+                    except ValueError:
+                        st.warning(f"⚠️ Invalid date format in Testing sheet: {test_date_str}. Use YYYY-MM-DD or DD/MM/YYYY")
+                        return False, date.today()
+        return False, date.today()
+    except Exception as e:
+        # If Testing sheet doesn't exist or has errors, return normal mode
+        return False, date.today()
 
 def get_current_date():
-    """Get current date - either real or simulated for testing"""
-    if st.session_state.testing_mode:
-        return st.session_state.test_date
+    """Get current date - either real or from testing configuration"""
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        return test_date
     else:
         return date.today()
 
 def get_current_datetime():
-    """Get current datetime - either real or simulated for testing"""
-    if st.session_state.testing_mode:
-        return datetime.combine(st.session_state.test_date, datetime.min.time())
+    """Get current datetime - either real or from testing configuration"""
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        return datetime.combine(test_date, datetime.min.time())
     else:
         return datetime.now()
 
@@ -225,63 +250,17 @@ if not menu:
 selected = st.sidebar.radio("📋 Navigation", menu)
 
 # ---------------------------------------
-# TESTING MODE CONTROLS (Admin only)
+# TESTING MODE STATUS (Visible to all users)
 # ---------------------------------------
-if st.session_state.role == "admin":
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🧪 Testing Mode")
-    
-    # Toggle testing mode
-    testing_mode = st.sidebar.checkbox(
-        "Enable Testing Mode", 
-        value=st.session_state.testing_mode,
-        help="Enable to simulate different dates for testing sprints"
-    )
-    
-    if testing_mode != st.session_state.testing_mode:
-        st.session_state.testing_mode = testing_mode
-        st.cache_data.clear()
-        if testing_mode:
-            st.sidebar.success("✅ Testing mode enabled")
-        else:
-            st.sidebar.success("✅ Testing mode disabled")
-    
-    # Date picker (only show when testing mode is enabled)
-    if st.session_state.testing_mode:
-        test_date = st.sidebar.date_input(
-            "Simulate Current Date",
-            value=st.session_state.test_date,
-            key="date_picker"
-        )
-        
-        if test_date != st.session_state.test_date:
-            st.session_state.test_date = test_date
-            st.sidebar.success(f"✅ Test date set to: {test_date}")
-            st.cache_data.clear()
-        
-        # Quick date navigation buttons
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            if st.button("◀️ -1 Day"):
-                st.session_state.test_date -= timedelta(days=1)
-                st.cache_data.clear()
-                st.rerun()
-        with col2:
-            if st.button("+1 Day ▶️"):
-                st.session_state.test_date += timedelta(days=1)
-                st.cache_data.clear()
-                st.rerun()
-        
-        # Reset to today button
-        if st.button("🔄 Reset to Today"):
-            st.session_state.test_date = date.today()
-            st.cache_data.clear()
-            st.rerun()
-
-# Display current date info
+testing_enabled, test_date = load_testing_config()
 current_date = get_current_date()
-if st.session_state.testing_mode:
-    st.sidebar.write(f"📅 **Current Date:** {current_date} 🧪")
+
+st.sidebar.markdown("---")
+
+if testing_enabled:
+    st.sidebar.warning(f"🧪 **TESTING MODE**")
+    st.sidebar.write(f"📅 Simulated Date: **{test_date}**")
+    st.sidebar.info("All dates and sprints use the simulated date above")
 else:
     st.sidebar.write(f"📅 **Current Date:** {current_date}")
 
@@ -294,12 +273,13 @@ if st.sidebar.button("Logout"):
 # ---------------------------------------
 # PAGE: DASHBOARD
 # ---------------------------------------
-elif selected == "Dashboard":
+if selected == "Dashboard":
     st.header("🎬 Movie Club Dashboard")
     
     # Show testing mode indicator
-    if st.session_state.testing_mode:
-        st.warning("🧪 **Testing Mode Active** - Using simulated date for all operations")
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        st.info(f"🧪 Testing Mode Active - Using simulated date: {test_date}")
     
     # Load all data
     users_data = load_sheet("Users")
@@ -450,8 +430,9 @@ elif selected == "Suggest Movie":
     st.header("🎥 Suggest a Movie (Anonymous)")
     
     # Show testing mode indicator
-    if st.session_state.testing_mode:
-        st.info(f"🧪 Testing Mode: Using date {get_current_date()}")
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        st.info(f"🧪 Testing Mode: Using date {test_date}")
     
     user_name = st.session_state.username
     movie_name = st.text_input("Movie Name")
@@ -491,8 +472,9 @@ elif selected == "Voting":
     st.header("🗳️ Voting: Have You Watched This Movie?")
     
     # Show testing mode indicator
-    if st.session_state.testing_mode:
-        st.info(f"🧪 Testing Mode: Using date {get_current_date()}")
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        st.info(f"🧪 Testing Mode: Using date {test_date}")
     
     voter_name = st.session_state.username
     movies = load_sheet("Suggestions")
@@ -532,8 +514,9 @@ elif selected == "Rate Movies":
     st.header("⭐ Rate Movies")
     
     # Show testing mode indicator
-    if st.session_state.testing_mode:
-        st.info(f"🧪 Testing Mode: Using date {get_current_date()}")
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        st.info(f"🧪 Testing Mode: Using date {test_date}")
     
     rater_name = st.session_state.username
     movies = load_sheet("Suggestions")
@@ -574,10 +557,122 @@ elif selected == "Admin Panel":
     st.header("⚙️ Admin Panel")
 
     # Show testing mode status
-    if st.session_state.testing_mode:
-        st.warning(f"🧪 **Testing Mode Active** - Current simulated date: {get_current_date()}")
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        st.warning(f"🧪 **TESTING MODE ACTIVE** - Current simulated date: {test_date}")
     else:
-        st.info(f"📅 **Production Mode** - Current date: {get_current_date()}")
+        st.info(f"📅 **PRODUCTION MODE** - Current date: {get_current_date()}")
+
+    st.subheader("Testing Configuration")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.write("Configure testing mode using the Testing sheet")
+        st.info("""
+        **To enable testing mode:**
+        1. Create a 'Testing' worksheet in your Google Sheet
+        2. Add headers: `date` (first row)
+        3. Set your test date in format YYYY-MM-DD or DD/MM/YYYY
+        
+        **To disable testing mode:**
+        - Clear the date cell or delete the Testing worksheet
+        """)
+    
+    with col2:
+        # Quick actions for testing
+        st.write("**Quick Actions**")
+        if testing_enabled:
+            if st.button("🔄 Disable Testing Mode"):
+                try:
+                    ws = sheet.worksheet("Testing")
+                    ws.clear()
+                    st.success("✅ Testing mode disabled!")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to disable testing: {e}")
+        else:
+            if st.button("🧪 Enable Testing Mode"):
+                try:
+                    # Create Testing sheet if it doesn't exist
+                    try:
+                        ws = sheet.worksheet("Testing")
+                    except:
+                        ws = sheet.add_worksheet(title="Testing", rows="100", cols="2")
+                        ws.append_row(["date"])  # Add header
+                    
+                    # Set today as test date
+                    ws.update_cell(2, 1, date.today().strftime('%Y-%m-%d'))
+                    st.success("✅ Testing mode enabled with today's date!")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to enable testing: {e}")
+
+    # Current testing configuration
+    if testing_enabled:
+        st.write("**Current Testing Configuration**")
+        st.code(f"""
+        Testing Sheet Status: ACTIVE
+        Simulated Date: {test_date}
+        """)
+        
+        # Quick date updates
+        st.write("**Quick Date Updates**")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("Set to Today"):
+                try:
+                    ws = sheet.worksheet("Testing")
+                    ws.update_cell(2, 1, date.today().strftime('%Y-%m-%d'))
+                    st.success("✅ Date set to today!")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to update date: {e}")
+        
+        with col2:
+            if st.button("+1 Day"):
+                try:
+                    ws = sheet.worksheet("Testing")
+                    new_date = test_date + timedelta(days=1)
+                    ws.update_cell(2, 1, new_date.strftime('%Y-%m-%d'))
+                    st.success(f"✅ Date set to {new_date}!")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to update date: {e}")
+        
+        with col3:
+            if st.button("-1 Day"):
+                try:
+                    ws = sheet.worksheet("Testing")
+                    new_date = test_date - timedelta(days=1)
+                    ws.update_cell(2, 1, new_date.strftime('%Y-%m-%d'))
+                    st.success(f"✅ Date set to {new_date}!")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to update date: {e}")
+        
+        # Manual date input
+        new_test_date = st.date_input(
+            "Set Custom Test Date",
+            value=test_date,
+            key="test_date_picker"
+        )
+        
+        if new_test_date != test_date:
+            try:
+                ws = sheet.worksheet("Testing")
+                ws.update_cell(2, 1, new_test_date.strftime('%Y-%m-%d'))
+                st.success(f"✅ Date set to {new_test_date}!")
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to update date: {e}")
 
     st.subheader("Page Control")
     # Use callbacks to save changes immediately
@@ -690,8 +785,9 @@ elif selected == "Finalize Sprint":
     st.header("🏁 Finalize Sprint")
     
     # Show testing mode indicator
-    if st.session_state.testing_mode:
-        st.warning(f"🧪 Testing Mode: Using date {get_current_date()}")
+    testing_enabled, test_date = load_testing_config()
+    if testing_enabled:
+        st.info(f"🧪 Testing Mode: Using date {test_date}")
     
     # Sprint configuration
     col1, col2 = st.columns(2)
