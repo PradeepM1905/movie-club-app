@@ -1000,7 +1000,7 @@ elif selected == "Finalize Sprint":
         # Points Calculation Logic
         user_points = {}
         user_breakdown = {}
-        movie_points_data = []
+        point_info_data = []
         
         # Points rules
         bonus_per_new_movie = 0.5
@@ -1013,86 +1013,88 @@ elif selected == "Finalize Sprint":
         
         # Calculate points for each user
         for user in df_users['user_name'].tolist():
-            # 1. Calculate AVERAGE rating for movies suggested by this user
+            # Get movies suggested by this user
             user_suggested_movies = df_suggestions[df_suggestions['user_name'] == user]['movie_name'].tolist()
             
-            total_avg_rating = 0
-            rated_movies_count = 0
-            
-            # Calculate average for each suggested movie
-            for movie in user_suggested_movies:
-                movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
-                if not movie_ratings.empty:
-                    movie_avg_rating = movie_ratings['rating'].mean()
-                    total_avg_rating += movie_avg_rating
-                    rated_movies_count += 1
-                    
-                    # Store movie-level data
-                    movie_points_data.append({
-                        "Movie": movie,
-                        "User": user,
-                        "Avg Rating": movie_avg_rating,
-                        "Rating Point": movie_avg_rating,  # Same as avg rating for calculation
-                        "Deduction": 0,
-                        "Bonus": 0,
-                        "Final Total": movie_avg_rating
-                    })
-            
-            # Calculate overall average rating
-            avg_rating_points = total_avg_rating / rated_movies_count if rated_movies_count > 0 else 0
-            
-            # 2. Calculate deductions
+            # Calculate deductions for movies this user did not watch
             user_not_watched = df_ratings[(df_ratings['user_name'] == user) & (df_ratings['did_not_watch'] == True)]
             total_deductions = len(user_not_watched) * deduction_per_missed_movie
             
-            # 3. Calculate bonus
+            # Calculate bonus for movies suggested that no one watched
             bonus = 0
+            unwatched_suggestions = []
             for movie in user_suggested_movies:
                 movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
                 if len(movie_ratings) == 0:
                     bonus += bonus_per_new_movie
-                    # Add bonus entry to movie data
-                    movie_points_data.append({
-                        "Movie": movie,
-                        "User": user,
-                        "Avg Rating": 0,
-                        "Rating Point": 0,
-                        "Deduction": 0,
-                        "Bonus": bonus_per_new_movie,
-                        "Final Total": bonus_per_new_movie
-                    })
+                    unwatched_suggestions.append(movie)
             
-            # 4. Add deductions entry
-            if total_deductions > 0:
-                movie_points_data.append({
-                    "Movie": "Not Watched Penalty",
+            # For each movie suggested by the user, calculate points
+            user_total_points = 0
+            
+            for movie in user_suggested_movies:
+                # Get all ratings for this movie where people actually watched it
+                movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
+                
+                total_point = 0
+                average_point = 0
+                
+                if not movie_ratings.empty:
+                    total_point = movie_ratings['rating'].sum()
+                    average_point = movie_ratings['rating'].mean()
+                
+                # Calculate deduction for this specific movie (proportional)
+                movie_deduction = 0
+                # Calculate bonus for this specific movie
+                movie_bonus = bonus_per_new_movie if movie in unwatched_suggestions else 0
+                
+                # Final total for this movie
+                final_total = average_point - movie_deduction + movie_bonus
+                
+                # Add to user's total points
+                user_total_points += final_total
+                
+                # Add to point info table
+                point_info_data.append({
+                    "Movie": movie,
                     "User": user,
-                    "Avg Rating": 0,
-                    "Rating Point": 0,
-                    "Deduction": -total_deductions,
-                    "Bonus": 0,
-                    "Final Total": -total_deductions
+                    "Total Point": round(total_point, 3),
+                    "Average Point": round(average_point, 3),
+                    "Deduction": round(movie_deduction, 3),
+                    "Bonus": round(movie_bonus, 3),
+                    "Final Total": round(final_total, 3)
                 })
             
-            # 5. Calculate final total (Average rating - deductions + bonus)
-            total_points = avg_rating_points - total_deductions + bonus
+            # Now add the deductions row (spread across all user's movies)
+            if total_deductions > 0 and len(user_suggested_movies) > 0:
+                # Add deductions to the first movie (or distribute as needed)
+                # For simplicity, we'll add it as a separate row but you can modify to distribute
+                point_info_data.append({
+                    "Movie": "Deductions",
+                    "User": user,
+                    "Total Point": 0,
+                    "Average Point": 0,
+                    "Deduction": round(-total_deductions, 3),
+                    "Bonus": 0,
+                    "Final Total": round(-total_deductions, 3)
+                })
+                user_total_points -= total_deductions
             
             # Store user breakdown
             user_breakdown[user] = {
-                "avg_rating_points": avg_rating_points,
+                "total_points": user_total_points,
                 "total_deductions": total_deductions,
                 "bonus_new_movies": bonus,
-                "total_points": total_points,
                 "movies_suggested": len(user_suggested_movies)
             }
-            user_points[user] = total_points
+            user_points[user] = user_total_points
         
         # Save to Points sheet
         try:
             ws_points = sheet.worksheet("Points")
         except:
             ws_points = sheet.add_worksheet(title="Points", rows="1000", cols="10")
-            ws_points.append_row(["sprint", "user_name", "total_points", "avg_rating_points", "deductions", "bonus", "movies_suggested", "finalized_date"])
+            ws_points.append_row(["sprint", "user_name", "total_points", "deductions", "bonus", "movies_suggested", "finalized_date"])
         
         # Save individual sprint results
         for user, points in user_points.items():
@@ -1100,18 +1102,18 @@ elif selected == "Finalize Sprint":
             ws_points.append_row([
                 current_sprint['sprint_id'],
                 user,
-                round(points, 2),
-                round(breakdown['avg_rating_points'], 2),
-                round(breakdown['total_deductions'], 2),
-                round(breakdown['bonus_new_movies'], 2),
+                round(points, 3),
+                round(breakdown['total_deductions'], 3),
+                round(breakdown['bonus_new_movies'], 3),
                 breakdown['movies_suggested'],
                 str(get_current_date())
             ])
         
-        # Update Users sheet
+        # Update Users sheet with accumulated points
         ws_users = sheet.worksheet("Users")
         users_records = ws_users.get_all_records()
         
+        # Create a mapping of current points for each user
         current_user_points = {}
         for user_record in users_records:
             user_name = user_record['user_name']
@@ -1127,7 +1129,7 @@ elif selected == "Finalize Sprint":
             if user_name in user_points:
                 current_points = current_user_points.get(user_name, 0.0)
                 new_points = current_points + user_points[user_name]
-                ws_users.update_cell(i + 2, 4, round(new_points, 2))
+                ws_users.update_cell(i + 2, 4, round(new_points, 3))
         
         st.success("✅ Sprint points calculated and saved successfully!")
         
@@ -1135,48 +1137,51 @@ elif selected == "Finalize Sprint":
         st.markdown("---")
         st.subheader("📋 Point Info")
         
-        df_movie_points = pd.DataFrame(movie_points_data)
-        st.dataframe(df_movie_points, use_container_width=True)
+        df_point_info = pd.DataFrame(point_info_data)
+        st.dataframe(df_point_info, use_container_width=True)
         
         # WhatsApp Messages Section
         st.markdown("---")
         st.subheader("📱 WhatsApp Messages")
         
-        # Message 1: Current Sprint Average Ratings
+        # Message 1: Current Sprint Average Points (per user)
         message1 = f"""🎥 {current_sprint['sprint_id']} Rating 🎥
 ━━━━━━━━━━━━━━
 """
-        # Sort users by average rating points (highest first)
-        sorted_by_avg = sorted(user_breakdown.items(), key=lambda x: x[1]['avg_rating_points'], reverse=True)
-        for user, breakdown in sorted_by_avg:
-            if breakdown['avg_rating_points'] > 0:  # Only include users with ratings
-                message1 += f"🍿 {user}: {breakdown['avg_rating_points']:.3f}\n"
+        # Calculate average points per user (sum of Final Total for their movies)
+        user_avg_points = {}
+        for row in point_info_data:
+            user = row['User']
+            final_total = row['Final Total']
+            if user not in user_avg_points:
+                user_avg_points[user] = 0
+            user_avg_points[user] += final_total
+        
+        # Sort users by average points (highest first)
+        sorted_by_avg = sorted(user_avg_points.items(), key=lambda x: x[1], reverse=True)
+        for user, avg_points in sorted_by_avg:
+            if avg_points > 0:  # Only include users with positive points
+                message1 += f"🍿 {user}: {avg_points:.3f}\n"
         
         message1 += "━━━━━━━━━━━━━━"
         
         # Message 2: Total Points after this sprint
         message2 = f"🏆 *Points after {current_sprint['sprint_id']} Sprint* 🏆\n━━━━━━━━━━━━━━\n"
         
-        # Get current total points from Users sheet
-        current_totals = {}
-        for user_record in users_records:
-            user_name = user_record['user_name']
-            points_value = user_record.get('points', '0')
-            try:
-                current_totals[user_name] = float(points_value) if points_value not in ['', None] else 0.0
-            except (ValueError, TypeError):
-                current_totals[user_name] = 0.0
-        
-        # Update with new points
-        for user, sprint_points in user_points.items():
-            if user in current_totals:
-                current_totals[user] += sprint_points
+        # Get updated total points from current_user_points (after adding this sprint's points)
+        updated_totals = {}
+        for user in current_user_points:
+            if user in user_points:
+                updated_totals[user] = current_user_points[user] + user_points[user]
+            else:
+                updated_totals[user] = current_user_points[user]
         
         # Sort by total points (highest first)
-        sorted_by_total = sorted(current_totals.items(), key=lambda x: x[1], reverse=True)
+        sorted_by_total = sorted(updated_totals.items(), key=lambda x: x[1], reverse=True)
         
         for user, total in sorted_by_total:
             if total > 0:  # Only include users with points
+                # Format with consistent spacing
                 message2 += f"👤 {user.ljust(12)}:{total:.3f}\n"
         
         message2 += "━━━━━━━━━━━━━━"
