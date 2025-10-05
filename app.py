@@ -97,27 +97,39 @@ def load_testing_config():
     """Load testing configuration from Google Sheets"""
     try:
         testing_data = load_sheet("Testing")
+        # Add null check here
+        if not testing_data or len(testing_data) == 0:
+            return False, date.today()
+            
         if testing_data and len(testing_data) > 0:
             # Get the first row which should contain the test date
             test_config = testing_data[0]
+            # Add null check for test_config
+            if not test_config:
+                return False, date.today()
+                
             test_date_str = test_config.get('date', '').strip()
             
-            if test_date_str:
+            # Add check for empty string
+            if not test_date_str:
+                return False, date.today()
+            
+            try:
+                # Parse date from string (assuming YYYY-MM-DD format)
+                test_date = datetime.strptime(test_date_str, '%Y-%m-%d').date()
+                return True, test_date
+            except ValueError:
+                # Try other common date formats
                 try:
-                    # Parse date from string (assuming YYYY-MM-DD format)
-                    test_date = datetime.strptime(test_date_str, '%Y-%m-%d').date()
+                    test_date = datetime.strptime(test_date_str, '%d/%m/%Y').date()
                     return True, test_date
                 except ValueError:
-                    # Try other common date formats
-                    try:
-                        test_date = datetime.strptime(test_date_str, '%d/%m/%Y').date()
-                        return True, test_date
-                    except ValueError:
-                        st.warning(f"⚠️ Invalid date format in Testing sheet: {test_date_str}. Use YYYY-MM-DD or DD/MM/YYYY")
-                        return False, date.today()
+                    st.warning(f"⚠️ Invalid date format in Testing sheet: {test_date_str}. Use YYYY-MM-DD or DD/MM/YYYY")
+                    return False, date.today()
         return False, date.today()
     except Exception as e:
         # If Testing sheet doesn't exist or has errors, return normal mode
+        # Remove the warning or handle silently
         return False, date.today()
 
 def get_current_date():
