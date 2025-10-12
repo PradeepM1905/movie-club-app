@@ -671,9 +671,9 @@ elif selected == "Voting":
 
 
     if current_sprint and movies:
-    movies = [movie for movie in movies 
-              if (movie.get('sprint') == current_sprint['sprint_id'] 
-              and movie.get('user_name') != voter_name)]  # Exclude user's own movies
+        movies = [movie for movie in movies 
+                  if (movie.get('sprint') == current_sprint['sprint_id'] 
+                  and movie.get('user_name') != voter_name)]  # Exclude user's own movies
 
     if not movies:
         st.info("No movie suggestions from other members found for current sprint.")
