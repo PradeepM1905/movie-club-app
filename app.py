@@ -178,6 +178,28 @@ def get_current_sprint():
         st.warning(f"Error loading sprints: {e}")
         return None
 
+def get_previous_sprint():
+    """Get the previous sprint for rating purposes"""
+    try:
+        sprints_data = load_sheet("Sprints")
+        current_date = get_current_date()
+        
+        # Sort sprints by end_date descending
+        sorted_sprints = sorted(sprints_data, 
+                              key=lambda x: datetime.strptime(x['end_date'], '%Y-%m-%d'), 
+                              reverse=True)
+        
+        # Find the sprint that ended just before today
+        for sprint in sorted_sprints:
+            end_date = datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
+            if end_date < current_date:
+                return sprint
+        
+        return None
+    except Exception as e:
+        st.warning(f"Error loading previous sprint: {e}")
+        return None
+
 def get_sprint_display_info():
     """Get sprint information for display"""
     current_sprint = get_current_sprint()
@@ -195,6 +217,50 @@ def get_sprint_display_info():
             'total_days': (sprint_end - datetime.strptime(current_sprint['start_date'], '%Y-%m-%d').date()).days + 1
         }
     return None
+
+# ---------------------------------------
+# CHECK USER ACTIVITY STATUS
+# ---------------------------------------
+def has_user_suggested_in_sprint(user_name, sprint_id):
+    """Check if user has already suggested a movie in the current sprint"""
+    try:
+        suggestions = load_sheet("Suggestions")
+        for suggestion in suggestions:
+            if (suggestion.get('user_name') == user_name and 
+                suggestion.get('sprint') == sprint_id):
+                return True
+        return False
+    except Exception as e:
+        st.warning(f"Error checking user suggestions: {e}")
+        return False
+
+def has_user_voted_in_sprint(user_name, sprint_id):
+    """Check if user has already voted in the current sprint"""
+    try:
+        votes = load_sheet("Voting")
+        # Get movies from current sprint
+        suggestions = load_sheet("Suggestions")
+        sprint_movies = [s['movie_name'] for s in suggestions if s.get('sprint') == sprint_id]
+        
+        # Check if user has voted for any movie in this sprint
+        user_votes = [v for v in votes if v.get('user_name') == user_name and v.get('movie_name') in sprint_movies]
+        return len(user_votes) > 0
+    except Exception as e:
+        st.warning(f"Error checking user votes: {e}")
+        return False
+
+def has_user_rated_sprint_movies(user_name, sprint_id):
+    """Check if user has already rated movies from a specific sprint"""
+    try:
+        ratings = load_sheet("Ratings")
+        for rating in ratings:
+            if (rating.get('user_name') == user_name and 
+                rating.get('sprint') == sprint_id):
+                return True
+        return False
+    except Exception as e:
+        st.warning(f"Error checking user ratings: {e}")
+        return False
 
 # ---------------------------------------
 # LOGIN SYSTEM
@@ -519,6 +585,13 @@ elif selected == "Suggest Movie":
         st.info(f"🧪 Testing Mode: Using date {test_date}")
     
     user_name = st.session_state.username
+    
+    # Check if user has already suggested in this sprint
+    if current_sprint and has_user_suggested_in_sprint(user_name, current_sprint['sprint_id']):
+        st.success("✅ You have already suggested a movie for this sprint!")
+        st.info("You can only suggest one movie per sprint.")
+        st.stop()
+    
     movie_name = st.text_input("Movie Name")
     genre = st.text_input("Genre")
     description = st.text_area("Where to watch it?")
@@ -554,6 +627,8 @@ elif selected == "Suggest Movie":
                     str(current_timestamp)  # timestamp
                 ])
                 st.success("✅ Movie suggestion submitted!")
+                st.cache_data.clear()
+                st.rerun()
             except Exception as e:
                 st.warning(f"Failed to write suggestion: {e}")
 
@@ -567,11 +642,15 @@ elif selected == "Voting":
 
     # Display sprint information in header
     sprint_info = get_sprint_display_info()
-    if sprint_info:
+    current_sprint = get_current_sprint()
+    
+    if sprint_info and current_sprint:
         st.header(f"🗳️ Voting - {sprint_info['sprint_id']}")
         st.write(f"**Have You Watched These Movies?**")
     else:
         st.header("🗳️ Voting")
+        st.warning("No active sprint found for voting.")
+        st.stop()
     
     # Show testing mode indicator
     testing_enabled, test_date = load_testing_config()
@@ -579,10 +658,16 @@ elif selected == "Voting":
         st.info(f"🧪 Testing Mode: Using date {test_date}")
     
     voter_name = st.session_state.username
+    
+    # Check if user has already voted in this sprint
+    if has_user_voted_in_sprint(voter_name, current_sprint['sprint_id']):
+        st.success("✅ You have already voted for this sprint!")
+        st.info("You can only vote once per sprint.")
+        st.stop()
+    
     movies = load_sheet("Suggestions")
 
     # Filter movies for current sprint if available
-    current_sprint = get_current_sprint()
     if current_sprint and movies:
         movies = [movie for movie in movies if movie.get('sprint') == current_sprint['sprint_id']]
 
@@ -607,6 +692,8 @@ elif selected == "Voting":
                 for movie_name, watched in votes_data:
                     ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
                 st.success("✅ Votes submitted!")
+                st.cache_data.clear()
+                st.rerun()
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
 
@@ -621,13 +708,21 @@ elif selected == "Rate Movies":
     # Display sprint information in header
     sprint_info = get_sprint_display_info()
     current_sprint = get_current_sprint()
+    previous_sprint = get_previous_sprint()
     
-    if sprint_info and current_sprint:
-        st.header(f"⭐ Rate Movies - {sprint_info['sprint_id']}")
-        st.write(f"**Rate the movies from current sprint**")
+    # Determine which sprint to rate - previous sprint for rating
+    rating_sprint = previous_sprint if previous_sprint else current_sprint
+    
+    if rating_sprint:
+        st.header(f"⭐ Rate Movies - {rating_sprint['sprint_id']}")
+        if rating_sprint == previous_sprint:
+            st.info("📅 Rating movies from the previous sprint")
+        else:
+            st.write(f"**Rate the movies from current sprint**")
     else:
         st.header("⭐ Rate Movies")
-        st.warning("No active sprint found. Ratings may not be associated with any sprint.")
+        st.warning("No sprint found for rating.")
+        st.stop()
     
     # Show testing mode indicator
     testing_enabled, test_date = load_testing_config()
@@ -635,14 +730,21 @@ elif selected == "Rate Movies":
         st.info(f"🧪 Testing Mode: Using date {test_date}")
     
     rater_name = st.session_state.username
+    
+    # Check if user has already rated this sprint's movies
+    if has_user_rated_sprint_movies(rater_name, rating_sprint['sprint_id']):
+        st.success("✅ You have already rated movies for this sprint!")
+        st.info("You can only rate once per sprint.")
+        st.stop()
+    
     movies = load_sheet("Suggestions")
 
-    # Filter movies for current sprint if available
-    if current_sprint and movies:
-        movies = [movie for movie in movies if movie.get('sprint') == current_sprint['sprint_id']]
+    # Filter movies for the rating sprint
+    if rating_sprint and movies:
+        movies = [movie for movie in movies if movie.get('sprint') == rating_sprint['sprint_id']]
 
     if not movies:
-        st.info("No movies to rate for current sprint.")
+        st.info("No movies to rate for this sprint.")
     else:
         ratings_data = []
         for movie in movies:
@@ -660,35 +762,21 @@ elif selected == "Rate Movies":
             try:
                 ws = sheet.worksheet("Ratings")
                 current_timestamp = get_current_datetime()
-                # Get current sprint ID or use empty string if no sprint
-                sprint_id = current_sprint['sprint_id'] if current_sprint else ""
                 
                 for movie_name, rating, dnw in ratings_data:
-                    # Check if rating already exists for this user and movie in current sprint
-                    existing_ratings = load_sheet("Ratings")
-                    rating_exists = False
-                    
-                    for existing_rating in existing_ratings:
-                        if (existing_rating.get('user_name') == rater_name and 
-                            existing_rating.get('movie_name') == movie_name and 
-                            existing_rating.get('sprint') == sprint_id):
-                            rating_exists = True
-                            break
-                    
-                    if rating_exists:
-                        st.warning(f"Rating already submitted for {movie_name}. Skipping...")
-                    else:
-                        # Append row with sprint information
-                        ws.append_row([
-                            sprint_id,          # sprint
-                            movie_name,         # movie_name
-                            rater_name,         # user_name
-                            rating,             # rating
-                            dnw,                # did_not_watch
-                            str(current_timestamp)  # timestamp
-                        ])
+                    # Append row with sprint information
+                    ws.append_row([
+                        rating_sprint['sprint_id'],  # sprint
+                        movie_name,         # movie_name
+                        rater_name,         # user_name
+                        rating,             # rating
+                        dnw,                # did_not_watch
+                        str(current_timestamp)  # timestamp
+                    ])
                 
                 st.success("✅ Ratings submitted!")
+                st.cache_data.clear()
+                st.rerun()
             except Exception as e:
                 st.warning(f"Failed to save ratings: {e}")
 
