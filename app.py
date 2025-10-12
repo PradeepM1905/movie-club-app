@@ -238,9 +238,11 @@ def has_user_voted_in_sprint(user_name, sprint_id):
     """Check if user has already voted in the current sprint"""
     try:
         votes = load_sheet("Voting")
-        # Get movies from current sprint
+        # Get movies from current sprint that are NOT user's own movies
         suggestions = load_sheet("Suggestions")
-        sprint_movies = [s['movie_name'] for s in suggestions if s.get('sprint') == sprint_id]
+        sprint_movies = [s['movie_name'] for s in suggestions 
+                        if (s.get('sprint') == sprint_id 
+                        and s.get('user_name') != user_name)]  # Exclude own movies
         
         # Check if user has voted for any movie in this sprint
         user_votes = [v for v in votes if v.get('user_name') == user_name and v.get('movie_name') in sprint_movies]
@@ -667,13 +669,16 @@ elif selected == "Voting":
     
     movies = load_sheet("Suggestions")
 
-    # Filter movies for current sprint if available
+
     if current_sprint and movies:
-        movies = [movie for movie in movies if movie.get('sprint') == current_sprint['sprint_id']]
+    movies = [movie for movie in movies 
+              if (movie.get('sprint') == current_sprint['sprint_id'] 
+              and movie.get('user_name') != voter_name)]  # Exclude user's own movies
 
     if not movies:
-        st.info("No movie suggestions found for current sprint.")
+        st.info("No movie suggestions from other members found for current sprint.")
     else:
+        st.info(f"Found {len(movies)} movies suggested by other members to vote on")
         votes_data = []
         for movie in movies:
             st.subheader(movie.get("movie_name", "Unknown"))
