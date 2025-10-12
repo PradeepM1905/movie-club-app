@@ -179,7 +179,7 @@ def get_current_sprint():
         return None
 
 def get_previous_sprint():
-    """Get the previous sprint for rating purposes"""
+    """Get the previous sprint for  purposes"""
     try:
         sprints_data = load_sheet("Sprints")
         current_date = get_current_date()
@@ -744,13 +744,15 @@ elif selected == "Rate Movies":
     
     movies = load_sheet("Suggestions")
 
-    # Filter movies for the rating sprint
     if rating_sprint and movies:
-        movies = [movie for movie in movies if movie.get('sprint') == rating_sprint['sprint_id']]
+        movies = [movie for movie in movies 
+                  if (movie.get('sprint') == rating_sprint['sprint_id'] 
+                  and movie.get('user_name') != rater_name)]  # Exclude user's own movies
 
     if not movies:
-        st.info("No movies to rate for this sprint.")
+        st.info("No movies from other members found to rate for this sprint.")
     else:
+        st.info(f"Found {len(movies)} movies from other members to rate")
         ratings_data = []
         for movie in movies:
             st.subheader(movie.get("movie_name", "Unknown"))
