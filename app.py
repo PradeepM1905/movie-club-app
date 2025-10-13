@@ -489,7 +489,7 @@ if selected == "Dashboard":
     st.markdown("---")
     
    # Current Sprint Movies Section
-    st.subheader("🎬 Current Sprint Movies & Ratings")
+    st.subheader("🎬 Current Sprint Movies")
     
     if not df_suggestions.empty:
         # Filter suggestions for current sprint if available
