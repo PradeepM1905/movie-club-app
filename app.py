@@ -488,7 +488,7 @@ if selected == "Dashboard":
     
     st.markdown("---")
     
-    # Current Sprint Movies Section
+   # Current Sprint Movies Section
     st.subheader("🎬 Current Sprint Movies & Ratings")
     
     if not df_suggestions.empty:
@@ -505,70 +505,25 @@ if selected == "Dashboard":
             for idx, movie in current_sprint_suggestions.iterrows():
                 col_idx = idx % 3
                 with cols[col_idx]:
-                    # Create a card-like container
+                    # Create a clean card-like container
                     with st.container():
-                        # Movie poster/image
+                        # Movie poster/image with consistent sizing
                         if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                            st.image(movie['image_url'], use_column_width=True)
+                            st.image(movie['image_url'], 
+                                   use_column_width=True, 
+                                   output_format="PNG")
                         else:
-                            # Placeholder if no image
+                            # Placeholder with same dimensions
                             st.image("https://via.placeholder.com/300x450/333333/FFFFFF?text=No+Poster", 
                                    use_column_width=True, 
-                                   caption="No poster available")
+                                   output_format="PNG")
                         
-                        # Movie title and genre
+                        # Movie title and genre only
                         st.subheader(movie.get('movie_name', 'Unknown Movie'))
-                        st.write(f"**Genre:** {movie.get('genre', 'Not specified')}")
+                        st.write(f"**{movie.get('genre', 'Not specified')}**")
                         
-                        # Where to watch
-                        if movie.get('description'):
-                            st.write(f"**Where to watch:** {movie.get('description', '')}")
-                        
-                        # Suggested by
-                        st.write(f"*Suggested by: {movie.get('user_name', 'Unknown')}*")
-                        
-                        # Ratings information if available
-                        if not df_ratings.empty:
-                            try:
-                                # Filter ratings for this movie
-                                movie_ratings = df_ratings[
-                                    (df_ratings['movie_name'] == movie['movie_name']) & 
-                                    (pd.notna(df_ratings['rating']))
-                                ]
-                                
-                                # Handle did_not_watch column safely
-                                if 'did_not_watch' in movie_ratings.columns:
-                                    movie_ratings['did_not_watch'] = movie_ratings['did_not_watch'].astype(str).str.lower().isin(['true', 'yes', '1', 'y', 't'])
-                                    valid_ratings = movie_ratings[~movie_ratings['did_not_watch']]
-                                else:
-                                    valid_ratings = movie_ratings
-                                
-                                if not valid_ratings.empty:
-                                    # Convert ratings to numeric safely
-                                    valid_ratings['rating'] = pd.to_numeric(valid_ratings['rating'], errors='coerce')
-                                    valid_ratings = valid_ratings.dropna(subset=['rating'])
-                                    
-                                    if not valid_ratings.empty:
-                                        avg_rating = valid_ratings['rating'].mean()
-                                        num_ratings = len(valid_ratings)
-                                        
-                                        # Display rating with stars
-                                        st.write(f"⭐ **{avg_rating:.1f}/10** ({num_ratings} ratings)")
-                                        
-                                        # Progress bar for rating visualization
-                                        progress_value = float(avg_rating) / 10.0
-                                        st.progress(min(1.0, max(0.0, progress_value)))
-                                    else:
-                                        st.info("No valid ratings yet")
-                                else:
-                                    st.info("No ratings yet")
-                                    
-                            except Exception as e:
-                                st.info("No ratings data available")
-                        else:
-                            st.info("No ratings yet")
-                        
-                        st.markdown("---")  # Separator between movies
+                        # Add some spacing between cards
+                        st.markdown("<br>", unsafe_allow_html=True)
         else:
             st.info("No movies suggested for current sprint.")
     else:
