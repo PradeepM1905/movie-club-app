@@ -491,54 +491,88 @@ if selected == "Dashboard":
     # Current Sprint Movies Section
     st.subheader("🎬 Current Sprint Movies & Ratings")
     
-    if not df_suggestions.empty and not df_ratings.empty:
-        # Calculate average ratings for each movie with error handling
-        try:
-            df_ratings['rating'] = pd.to_numeric(df_ratings['rating'], errors='coerce')
+    if not df_suggestions.empty:
+        # Filter suggestions for current sprint if available
+        if sprint_info:
+            current_sprint_suggestions = df_suggestions[df_suggestions['sprint'] == sprint_info['sprint_id']]
+        else:
+            current_sprint_suggestions = df_suggestions
+        
+        if not current_sprint_suggestions.empty:
+            # Display movies in a grid layout
+            cols = st.columns(3)  # 3 columns for the grid
             
-            # Filter out "did not watch" ratings - handle different data types
-            if 'did_not_watch' in df_ratings.columns:
-                # Convert did_not_watch to boolean safely
-                df_ratings['did_not_watch'] = df_ratings['did_not_watch'].astype(str).str.lower().isin(['true', 'yes', '1', 'y', 't'])
-                df_valid_ratings = df_ratings[~df_ratings['did_not_watch']]
-            else:
-                df_valid_ratings = df_ratings
-            
-            if not df_valid_ratings.empty:
-                movie_ratings = df_valid_ratings.groupby('movie_name')['rating'].agg(['mean', 'count']).round(2)
-                movie_ratings = movie_ratings.rename(columns={'mean': 'Average Rating', 'count': 'Number of Ratings'})
-                movie_ratings = movie_ratings.sort_values('Average Rating', ascending=False)
-                
-                # Display movies with ratings
-                for movie, ratings in movie_ratings.iterrows():
-                    avg_rating = ratings['Average Rating']
-                    num_ratings = int(ratings['Number of Ratings'])
-                    
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"**{movie}**")
-                    with col2:
-                        st.write(f"⭐ {avg_rating}/10 ({num_ratings} ratings)")
-                    
-                    # Safe progress bar
-                    progress_value = float(avg_rating) / 10.0
-                    st.progress(min(1.0, max(0.0, progress_value)))
-            else:
-                st.info("No valid ratings available for current movies.")
-                
-        except Exception as e:
-            st.error(f"Error processing ratings: {e}")
-            st.info("Showing suggested movies without ratings:")
-            for _, movie in df_suggestions.iterrows():
-                st.write(f"• **{movie['movie_name']}** - {movie.get('genre', '')}")
-                
-    elif not df_suggestions.empty:
-        st.info("Movies suggested but no ratings yet.")
-        # Show just the suggested movies
-        for _, movie in df_suggestions.iterrows():
-            st.write(f"• **{movie['movie_name']}** - {movie.get('genre', '')}")
+            for idx, movie in current_sprint_suggestions.iterrows():
+                col_idx = idx % 3
+                with cols[col_idx]:
+                    # Create a card-like container
+                    with st.container():
+                        # Movie poster/image
+                        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                            st.image(movie['image_url'], use_column_width=True)
+                        else:
+                            # Placeholder if no image
+                            st.image("https://via.placeholder.com/300x450/333333/FFFFFF?text=No+Poster", 
+                                   use_column_width=True, 
+                                   caption="No poster available")
+                        
+                        # Movie title and genre
+                        st.subheader(movie.get('movie_name', 'Unknown Movie'))
+                        st.write(f"**Genre:** {movie.get('genre', 'Not specified')}")
+                        
+                        # Where to watch
+                        if movie.get('description'):
+                            st.write(f"**Where to watch:** {movie.get('description', '')}")
+                        
+                        # Suggested by
+                        st.write(f"*Suggested by: {movie.get('user_name', 'Unknown')}*")
+                        
+                        # Ratings information if available
+                        if not df_ratings.empty:
+                            try:
+                                # Filter ratings for this movie
+                                movie_ratings = df_ratings[
+                                    (df_ratings['movie_name'] == movie['movie_name']) & 
+                                    (pd.notna(df_ratings['rating']))
+                                ]
+                                
+                                # Handle did_not_watch column safely
+                                if 'did_not_watch' in movie_ratings.columns:
+                                    movie_ratings['did_not_watch'] = movie_ratings['did_not_watch'].astype(str).str.lower().isin(['true', 'yes', '1', 'y', 't'])
+                                    valid_ratings = movie_ratings[~movie_ratings['did_not_watch']]
+                                else:
+                                    valid_ratings = movie_ratings
+                                
+                                if not valid_ratings.empty:
+                                    # Convert ratings to numeric safely
+                                    valid_ratings['rating'] = pd.to_numeric(valid_ratings['rating'], errors='coerce')
+                                    valid_ratings = valid_ratings.dropna(subset=['rating'])
+                                    
+                                    if not valid_ratings.empty:
+                                        avg_rating = valid_ratings['rating'].mean()
+                                        num_ratings = len(valid_ratings)
+                                        
+                                        # Display rating with stars
+                                        st.write(f"⭐ **{avg_rating:.1f}/10** ({num_ratings} ratings)")
+                                        
+                                        # Progress bar for rating visualization
+                                        progress_value = float(avg_rating) / 10.0
+                                        st.progress(min(1.0, max(0.0, progress_value)))
+                                    else:
+                                        st.info("No valid ratings yet")
+                                else:
+                                    st.info("No ratings yet")
+                                    
+                            except Exception as e:
+                                st.info("No ratings data available")
+                        else:
+                            st.info("No ratings yet")
+                        
+                        st.markdown("---")  # Separator between movies
+        else:
+            st.info("No movies suggested for current sprint.")
     else:
-        st.info("No movies suggested for current sprint.")
+        st.info("No movies suggested yet.")
     
     st.markdown("---")
     
