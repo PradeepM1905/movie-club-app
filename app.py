@@ -488,7 +488,7 @@ if selected == "Dashboard":
     
     st.markdown("---")
     
-   # Current Sprint Movies Section
+   # Current Sprint Movies Section - Minimal Version
     st.subheader("🎬 Current Sprint Movies & Ratings")
     
     if not df_suggestions.empty:
@@ -500,30 +500,21 @@ if selected == "Dashboard":
         
         if not current_sprint_suggestions.empty:
             # Display movies in a grid layout
-            cols = st.columns(3)  # 3 columns for the grid
+            cols = st.columns(3)
             
             for idx, movie in current_sprint_suggestions.iterrows():
                 col_idx = idx % 3
                 with cols[col_idx]:
-                    # Create a clean card-like container
-                    with st.container():
-                        # Movie poster/image with consistent sizing
-                        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                            st.image(movie['image_url'], 
-                                   use_column_width=True, 
-                                   output_format="PNG")
-                        else:
-                            # Placeholder with same dimensions
-                            st.image("https://via.placeholder.com/300x450/333333/FFFFFF?text=No+Poster", 
-                                   use_column_width=True, 
-                                   output_format="PNG")
-                        
-                        # Movie title and genre only
-                        st.subheader(movie.get('movie_name', 'Unknown Movie'))
-                        st.write(f"**{movie.get('genre', 'Not specified')}**")
-                        
-                        # Add some spacing between cards
-                        st.markdown("<br>", unsafe_allow_html=True)
+                    # Movie poster/image
+                    if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                        st.image(movie['image_url'], use_column_width=True)
+                    else:
+                        st.image("https://via.placeholder.com/300x450/333333/FFFFFF?text=No+Poster", 
+                               use_column_width=True)
+                    
+                    # Movie title and genre only
+                    st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+                    st.write(f"*{movie.get('genre', 'Not specified')}*")
         else:
             st.info("No movies suggested for current sprint.")
     else:
