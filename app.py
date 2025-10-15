@@ -311,6 +311,10 @@ if not st.session_state.logged_in:
     
     # Always show password field for all users
     password = st.text_input("Password", type="password")
+
+
+    #DELETE THIS Add the agreement checkbox
+    agreed = st.checkbox("I agree that La Haine was an excellent movie", value=False)
     
     # Show password hint based on user type
     if username and users_roles.get(username) == "admin":
@@ -321,6 +325,8 @@ if not st.session_state.logged_in:
     if st.button("Login"):
         if not password:
             st.error("Please enter your password")
+        elif not agreed:  # Check if checkbox is checked
+            st.error("Please check the 'I agree' checkbox to continue")
         else:
             if login(username, password):
                 st.rerun()
