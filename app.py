@@ -314,7 +314,7 @@ if not st.session_state.logged_in:
 
 
     #DELETE THIS Add the agreement checkbox
-    agreed = st.checkbox("I agree that <strong>La Haine</strong> was an excellent movie", value=False)
+    agreed = st.checkbox("I agree that **La Haine** was an excellent movie", value=False)
     
     # Show password hint based on user type
     if username and users_roles.get(username) == "admin":
