@@ -208,12 +208,6 @@ def render_voting():
         st.warning("Voting page is currently disabled by admin.")
         return
 
-    if st.session_state.get('votes_submitted'):
-        st.success("✅ You have already voted for this sprint!")
-        st.info("You can only vote once per sprint.")
-        st.session_state.votes_submitted = False
-        return
-
     # Display sprint information in header
     sprint_info = get_sprint_display_info()
     current_sprint = get_current_sprint()
@@ -268,6 +262,11 @@ def render_voting():
             votes_data.append((movie.get('movie_name',''), watched))
 
         if st.button("Submit Votes"):
+            # Validate that all movies have been voted on
+            if len(votes_data) != len(movies):
+                st.error("❌ Please vote Yes or No for all movies before submitting!")
+                return
+
             try:
                 sheet = connect_google_sheets()
                 ws = sheet.worksheet("Voting")
@@ -276,8 +275,13 @@ def render_voting():
                     ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
                 st.success("✅ Votes submitted!")
                 st.cache_data.clear()
+                # Set flag and show success immediately
                 st.session_state.votes_submitted = True
-                st.stop()
+                # Show success page right here
+                st.success("✅ You have successfully voted for this sprint!")
+                st.info("Thank you for participating in the voting!")
+                st.balloons()
+                return  # Stop further execution
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
 
