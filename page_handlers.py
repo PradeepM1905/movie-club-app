@@ -55,7 +55,10 @@ def render_dashboard():
         # Create leaderboard from Users sheet points with proper error handling
         leaderboard_data = []
         for _, user in df_users.iterrows():
-            # Safely handle points conversion
+            # Skip admin users
+            if user.get('role', '').lower() == 'admin':
+                continue
+
             points = user.get('points', 0)
             try:
                 points_float = float(points) if points != '' and points is not None else 0.0
@@ -65,8 +68,7 @@ def render_dashboard():
             leaderboard_data.append({
                 "Rank": len(leaderboard_data) + 1,
                 "User": user['user_name'],
-                "Total Points": points_float,
-                "Role": user['role']
+                "Total Points": points_float
             })
 
         # Sort by points descending with safe comparison
@@ -77,7 +79,7 @@ def render_dashboard():
             item['Rank'] = i + 1
 
         df_leaderboard = pd.DataFrame(leaderboard_data)
-        st.dataframe(df_leaderboard, use_container_width=True)
+        st.dataframe(df_leaderboard, use_container_width=True, hide_index=True)
     else:
         st.info("No user data available.")
 
