@@ -45,7 +45,7 @@ sheet = connect_google_sheets()
 # INITIALIZE LOGIN SYSTEM
 # ---------------------------------------
 initialize_session_state()
-users_list, users_roles, users_passwords = reload_users(sheet)
+users_list, users_roles, users_passwords = reload_users()
 
 # Check if user is logged in
 if not st.session_state.logged_in:
@@ -67,9 +67,9 @@ if "enable_rating" not in st.session_state:
 # ---------------------------------------
 # Load page config from Google Sheets to persist across sessions
 @st.cache_data(ttl=120)
-def load_page_config(sheet):
+def load_page_config():
     try:
-        config_data = load_sheet(sheet, "Config")
+        config_data = load_sheet("Config")
         config_dict = {}
         for row in config_data:
             config_dict[row['key']] = row['value'].lower() == 'true'
@@ -78,7 +78,7 @@ def load_page_config(sheet):
         return {}
 
 # Get page config
-page_config = load_page_config(sheet)
+page_config = load_page_config()
 
 # Update session state with persisted config
 st.session_state.enable_suggestion = page_config.get('enable_suggestion', True)
@@ -106,9 +106,9 @@ selected = st.sidebar.radio("📋 Navigation", menu)
 # ---------------------------------------
 # TESTING MODE STATUS (Visible to all users)
 # ---------------------------------------
-testing_enabled, test_date = load_testing_config(sheet)
-current_date = get_current_date(sheet)
-sprint_info = get_sprint_display_info(sheet)
+testing_enabled, test_date = load_testing_config()
+current_date = get_current_date()
+sprint_info = get_sprint_display_info()
 
 st.sidebar.markdown("---")
 
