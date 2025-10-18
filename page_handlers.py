@@ -24,6 +24,16 @@ def render_dashboard():
     if testing_enabled:
         st.info(f"🧪 Testing Mode Active - Using simulated date: {test_date}")
 
+    # Load all data
+    users_data = load_sheet("Users")
+    suggestions = load_sheet("Suggestions")
+    ratings = load_sheet("Ratings")
+
+    # Convert to DataFrames
+    df_users = pd.DataFrame(users_data)
+    df_suggestions = pd.DataFrame(suggestions) if suggestions else pd.DataFrame()
+    df_ratings = pd.DataFrame(ratings) if ratings else pd.DataFrame()
+
     # Sprint Countdown Section
     st.subheader("⏰ Sprint Progress")
 
