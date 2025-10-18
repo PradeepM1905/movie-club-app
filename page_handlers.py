@@ -79,14 +79,7 @@ def render_dashboard():
             item['Rank'] = i + 1
 
         df_leaderboard = pd.DataFrame(leaderboard_data)
-        # Add CSS for center alignment
-        st.markdown("""
-        <style>
-            .dataframe th, .dataframe td {
-                text-align: center !important;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        st.table(df_leaderboard.style.set_properties(**{'text-align': 'center'}))
         st.dataframe(df_leaderboard, use_container_width=True, hide_index=True)
     else:
         st.info("No user data available.")
