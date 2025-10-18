@@ -8,6 +8,9 @@ import cloudinary.uploader
 from oauth2client.service_account import ServiceAccountCredentials
 import hashlib
 
+# Import the login system
+from login_system import initialize_session_state, render_login_page, hash_password
+
 # ---------------------------------------
 # PAGE CONFIG
 # ---------------------------------------
@@ -81,13 +84,6 @@ def reload_users():
             users_passwords[uname] = password
     
     return users_list, users_roles, users_passwords
-
-# ---------------------------------------
-# PASSWORD HASHING
-# ---------------------------------------
-def hash_password(password):
-    """Simple password hashing for basic security"""
-    return hashlib.sha256(password.encode()).hexdigest()
 
 # ---------------------------------------
 # TESTING MODE FROM GOOGLE SHEETS
@@ -265,71 +261,14 @@ def has_user_rated_sprint_movies(user_name, sprint_id):
         return False
 
 # ---------------------------------------
-# LOGIN SYSTEM
+# INITIALIZE LOGIN SYSTEM
 # ---------------------------------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = None
-if "role" not in st.session_state:
-    st.session_state.role = "normal"
-
+initialize_session_state()
 users_list, users_roles, users_passwords = reload_users()
 
-def login(username, password):
-    if username not in users_roles:
-        st.error("Invalid username")
-        return False
-    
-    role = users_roles[username]
-    stored_password = users_passwords.get(username, "")
-    
-    if role == "admin":
-        # Admin uses the secret password
-        if password != ADMIN_PASS:
-            st.error("Incorrect admin password")
-            return False
-    else:
-        # Normal user uses password from Google Sheets
-        if not stored_password or stored_password == "":
-            st.error("No password set for this user. Please contact admin.")
-            return False
-        
-        if hash_password(password) != stored_password:
-            st.error("Incorrect password")
-            return False
-    
-    st.session_state.logged_in = True
-    st.session_state.username = username
-    st.session_state.role = role
-    st.success(f"✅ Logged in as {username} ({role})")
-    return True
-
+# Check if user is logged in
 if not st.session_state.logged_in:
-    st.title("🎬 Movie Club Login")
-    username = st.selectbox("Select Username", users_list)
-    
-    # Always show password field for all users
-    password = st.text_input("Password", type="password")
-
-
-    #DELETE THIS Add the agreement checkbox
-    # agreed = st.checkbox("I agree that **La Haine** was an excellent movie", value=False)
-    
-    # Show password hint based on user type
-    if username and users_roles.get(username) == "admin":
-        st.info("🔐 Admin login - enter admin password")
-    elif username:
-        st.info("🔐 User login - enter your personal password")
-
-    if st.button("Login"):
-        if not password:
-            st.error("Please enter your password")
-        #elif not agreed:  # Check if checkbox is checked
-            #st.error("Please check the 'I agree' checkbox to continue")
-        else:
-            if login(username, password):
-                st.rerun()
+    render_login_page(users_list, users_roles, users_passwords, ADMIN_PASS)
     st.stop()
 
 # ---------------------------------------
