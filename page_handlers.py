@@ -79,7 +79,16 @@ def render_dashboard():
             item['Rank'] = i + 1
 
         df_leaderboard = pd.DataFrame(leaderboard_data)
-        st.dataframe(df_leaderboard, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_leaderboard,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Rank": st.column_config.NumberColumn("Rank", width="small"),
+                "User": st.column_config.TextColumn("User", width="medium"),
+                "Total Points": st.column_config.NumberColumn("Total Points", width="medium")
+            }
+        )
     else:
         st.info("No user data available.")
 
