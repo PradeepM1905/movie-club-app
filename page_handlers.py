@@ -278,7 +278,7 @@ def render_voting():
                 # Show success and use session state to redirect
                 st.success("✅ Votes submitted successfully!")
                 st.balloons()
-                st.button("Submit Votes", disabled=True)  # Disabled button
+                st.rerun()
 
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
