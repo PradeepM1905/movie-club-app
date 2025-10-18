@@ -252,11 +252,19 @@ def render_voting():
             st.write(f"Where to watch: {movie.get('description','')}")
             if movie.get("image_url"):
                 st.image(movie["image_url"], width=200)
-            watched = st.checkbox(f"Have you watched this?", key=f"vote_{movie.get('movie_name','')}")
+            watched = st.radio(
+                f"Have you watched {movie.get('movie_name', 'this movie')}?",
+                options=["Yes", "No"],
+                key=f"vote_{movie.get('movie_name','')}"
+            )
+            watched = watched == "Yes"
             st.markdown("---")
             votes_data.append((movie.get('movie_name',''), watched))
 
         if st.button("Submit Votes"):
+            if len(votes_data) != len(movies):
+                st.error("❌ Please vote Yes or No for all movies before submitting!")
+                return
             try:
                 sheet = connect_google_sheets()
                 ws = sheet.worksheet("Voting")
