@@ -6,10 +6,10 @@ from sheets_utils import load_sheet
 # SPRINT MANAGEMENT
 # ---------------------------------------
 @st.cache_data(ttl=120)
-def get_current_sprint(sheet):
+def get_current_sprint():
     """Get the current active sprint based on date"""
     try:
-        sprints_data = load_sheet(sheet, "Sprints")
+        sprints_data = load_sheet("Sprints")
         current_date = get_current_date(sheet)
 
         for sprint in sprints_data:
@@ -32,10 +32,10 @@ def get_current_sprint(sheet):
         st.warning(f"Error loading sprints: {e}")
         return None
 
-def get_previous_sprint(sheet):
+def get_previous_sprint():
     """Get the previous sprint for rating purposes"""
     try:
-        sprints_data = load_sheet(sheet, "Sprints")
+        sprints_data = load_sheet("Sprints")
         current_date = get_current_date(sheet)
 
         # Sort sprints by end_date descending
@@ -54,11 +54,11 @@ def get_previous_sprint(sheet):
         st.warning(f"Error loading previous sprint: {e}")
         return None
 
-def get_sprint_display_info(sheet):
+def get_sprint_display_info():
     """Get sprint information for display"""
-    current_sprint = get_current_sprint(sheet)
+    current_sprint = get_current_sprint()
     if current_sprint:
-        current_date = get_current_date(sheet)
+        current_date = get_current_date()
         sprint_end = datetime.strptime(current_sprint['end_date'], '%Y-%m-%d').date()
         days_remaining = (sprint_end - current_date).days
 
@@ -76,10 +76,10 @@ def get_sprint_display_info(sheet):
 # TESTING MODE FROM GOOGLE SHEETS
 # ---------------------------------------
 @st.cache_data(ttl=60)
-def load_testing_config(sheet):
+def load_testing_config():
     """Load testing configuration from Google Sheets"""
     try:
-        testing_data = load_sheet(sheet, "Testing")
+        testing_data = load_sheet("Testing")
         # Add null check here
         if not testing_data or len(testing_data) == 0:
             return False, date.today()
@@ -114,17 +114,17 @@ def load_testing_config(sheet):
         # If Testing sheet doesn't exist or has errors, return normal mode
         return False, date.today()
 
-def get_current_date(sheet):
+def get_current_date():
     """Get current date - either real or from testing configuration"""
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         return test_date
     else:
         return date.today()
 
-def get_current_datetime(sheet):
+def get_current_datetime():
     """Get current datetime - either real or from testing configuration"""
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         return datetime.combine(test_date, datetime.min.time())
     else:

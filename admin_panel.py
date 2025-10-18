@@ -1,9 +1,9 @@
 import streamlit as st
 from datetime import date, timedelta
-from sheets_utils import load_sheet
+from sheets_utils import load_sheet, connect_google_sheets
 from sprint_management import get_sprint_display_info, get_current_date, load_testing_config
 
-def render_admin_panel(sheet, hash_password):
+def render_admin_panel(hash_password):
     """Render the admin panel page"""
     if st.session_state.role != "admin":
         st.warning("Admin access only.")
@@ -12,14 +12,14 @@ def render_admin_panel(sheet, hash_password):
     st.header("⚙️ Admin Panel")
 
     # Show testing mode status
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         st.warning(f"🧪 **TESTING MODE ACTIVE** - Current simulated date: {test_date}")
     else:
-        st.info(f"📅 **PRODUCTION MODE** - Current date: {get_current_date(sheet)}")
+        st.info(f"📅 **PRODUCTION MODE** - Current date: {get_current_date()}")
 
     # Show current sprint information
-    sprint_info = get_sprint_display_info(sheet)
+    sprint_info = get_sprint_display_info()
     if sprint_info:
         st.subheader("🏃‍♂️ Current Sprint Information")
         col1, col2, col3 = st.columns(3)
@@ -55,6 +55,7 @@ def render_admin_panel(sheet, hash_password):
         if testing_enabled:
             if st.button("🔄 Disable Testing Mode"):
                 try:
+                    sheet = connect_google_sheets()
                     ws = sheet.worksheet("Testing")
                     ws.clear()
                     st.success("✅ Testing mode disabled!")
@@ -67,6 +68,7 @@ def render_admin_panel(sheet, hash_password):
                 try:
                     # Create Testing sheet if it doesn't exist
                     try:
+                        sheet = connect_google_sheets()
                         ws = sheet.worksheet("Testing")
                     except:
                         ws = sheet.add_worksheet(title="Testing", rows="100", cols="2")
@@ -148,6 +150,7 @@ def render_admin_panel(sheet, hash_password):
     # Use callbacks to save changes immediately
     def update_page_config():
         try:
+            sheet = connect_google_sheets()
             ws = sheet.worksheet("Config")
             # Clear existing config
             ws.clear()
@@ -201,6 +204,7 @@ def render_admin_panel(sheet, hash_password):
         if st.button("Add User"):
             if new_user and user_password:
                 try:
+                    sheet = connect_google_sheets()
                     ws = sheet.worksheet("Users")
                     # Hash the password before storing
                     hashed_password = hash_password(user_password)
@@ -215,7 +219,7 @@ def render_admin_panel(sheet, hash_password):
 
     with tab2:
         st.write("Reset password for existing user")
-        users_data = load_sheet(sheet, "Users")
+        users_data = load_sheet("Users")
         user_names = [user['user_name'] for user in users_data if user['user_name'] != st.session_state.username]
 
         if user_names:
@@ -225,6 +229,7 @@ def render_admin_panel(sheet, hash_password):
             if st.button("Reset Password"):
                 if new_password:
                     try:
+                        sheet = connect_google_sheets()
                         ws = sheet.worksheet("Users")
                         users_records = ws.get_all_records()
 

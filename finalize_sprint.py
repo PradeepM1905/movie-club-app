@@ -1,17 +1,17 @@
 import streamlit as st
 import pandas as pd
-from sheets_utils import load_sheet
+from sheets_utils import load_sheet, connect_google_sheets
 from sprint_management import get_sprint_display_info, get_current_sprint, get_current_date, load_testing_config
 
-def render_finalize_sprint(sheet, hash_password):
+def render_finalize_sprint(hash_password):
     """Render the finalize sprint page"""
     if st.session_state.role != "admin":
         st.warning("Admin access only.")
         return
 
     # Display sprint information in header
-    sprint_info = get_sprint_display_info(sheet)
-    current_sprint = get_current_sprint(sheet)
+    sprint_info = get_sprint_display_info()
+    current_sprint = get_current_sprint()
 
     if sprint_info and current_sprint:
         st.header(f"🏁 Finalize Sprint - {sprint_info['sprint_id']}")
@@ -22,16 +22,16 @@ def render_finalize_sprint(sheet, hash_password):
         return
 
     # Show testing mode indicator
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         st.info(f"🧪 Testing Mode: Using date {test_date}")
 
     st.markdown("---")
 
     # Load current data - filter for current sprint
-    all_suggestions = load_sheet(sheet, "Suggestions")
-    all_ratings = load_sheet(sheet, "Ratings")
-    users_data = load_sheet(sheet, "Users")
+    all_suggestions = load_sheet("Suggestions")
+    all_ratings = load_sheet("Ratings")
+    users_data = load_sheet("Users")
 
     # Filter data for current sprint
     suggestions = [s for s in all_suggestions if s.get('sprint') == current_sprint['sprint_id']]
@@ -157,6 +157,7 @@ def render_finalize_sprint(sheet, hash_password):
             user_points[user] = user_total_points
 
         # Save to Points sheet
+        sheet = connect_google_sheets()
         try:
             ws_points = sheet.worksheet("Points")
         except:
@@ -173,7 +174,7 @@ def render_finalize_sprint(sheet, hash_password):
                 round(breakdown['total_deductions'], 3),
                 round(breakdown['bonus_new_movies'], 3),
                 breakdown['movies_suggested'],
-                str(get_current_date(sheet))
+                str(get_current_date())
             ])
 
         # Update Users sheet with accumulated points

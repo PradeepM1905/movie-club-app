@@ -141,14 +141,14 @@ if st.sidebar.button("Logout"):
 # PAGE ROUTING
 # ---------------------------------------
 if selected == "Dashboard":
-    render_dashboard(sheet)
+    render_dashboard()
 elif selected == "Suggest Movie":
-    render_suggest_movie(sheet)
+    render_suggest_movie()
 elif selected == "Voting":
-    render_voting(sheet)
+    render_voting()
 elif selected == "Rate Movies":
-    render_rate_movies(sheet)
+    render_rate_movies()
 elif selected == "Admin Panel":
-    render_admin_panel(sheet, hash_password)
+    render_admin_panel(hash_password)
 elif selected == "Finalize Sprint":
-    render_finalize_sprint(sheet, hash_password)
+    render_finalize_sprint(hash_password)

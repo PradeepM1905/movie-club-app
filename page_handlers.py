@@ -1,17 +1,16 @@
 import streamlit as st
 import pandas as pd
 import cloudinary.uploader
-from sheets_utils import load_sheet
+from sheets_utils import load_sheet, connect_google_sheets
 from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime
 from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
-
 # ---------------------------------------
 # PAGE: DASHBOARD
 # ---------------------------------------
-def render_dashboard(sheet):
+def render_dashboard():
     """Render the dashboard page"""
     # Display sprint information in header
-    sprint_info = get_sprint_display_info(sheet)
+    sprint_info = get_sprint_display_info()
     if sprint_info:
         st.header(f"🎬 Movie Club Dashboard - {sprint_info['sprint_id']}")
         st.write(f"**{sprint_info['description']}** | {sprint_info['start_date']} to {sprint_info['end_date']} | {sprint_info['days_remaining']} days remaining")
@@ -21,14 +20,14 @@ def render_dashboard(sheet):
 
     # Show testing mode indicator
     from sprint_management import load_testing_config
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         st.info(f"🧪 Testing Mode Active - Using simulated date: {test_date}")
 
     # Load all data
-    users_data = load_sheet(sheet, "Users")
-    suggestions = load_sheet(sheet, "Suggestions")
-    ratings = load_sheet(sheet, "Ratings")
+    users_data = load_sheet("Users")
+    suggestions = load_sheet("Suggestions")
+    ratings = load_sheet("Ratings")
 
     # Convert to DataFrames
     df_users = pd.DataFrame(users_data)
@@ -148,15 +147,15 @@ def render_dashboard(sheet):
 # ---------------------------------------
 # PAGE: SUGGEST MOVIE
 # ---------------------------------------
-def render_suggest_movie(sheet):
+def render_suggest_movie():
     """Render the suggest movie page"""
     if not st.session_state.enable_suggestion and st.session_state.role != "admin":
         st.warning("Suggestion page is currently disabled by admin.")
         return
 
     # Display sprint information in header
-    sprint_info = get_sprint_display_info(sheet)
-    current_sprint = get_current_sprint(sheet)
+    sprint_info = get_sprint_display_info()
+    current_sprint = get_current_sprint()
 
     if sprint_info and current_sprint:
         st.header(f"🎥 Suggest a Movie - {sprint_info['sprint_id']}")
@@ -167,14 +166,14 @@ def render_suggest_movie(sheet):
 
     # Show testing mode indicator
     from sprint_management import load_testing_config
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         st.info(f"🧪 Testing Mode: Using date {test_date}")
 
     user_name = st.session_state.username
 
     # Check if user has already suggested in this sprint
-    if current_sprint and has_user_suggested_in_sprint(sheet, user_name, current_sprint['sprint_id']):
+    if current_sprint and has_user_suggested_in_sprint(user_name, current_sprint['sprint_id']):
         st.success("✅ You have already suggested a movie for this sprint!")
         st.info("You can only suggest one movie per sprint.")
         return
@@ -197,9 +196,10 @@ def render_suggest_movie(sheet):
                     st.warning(f"Cloudinary upload failed: {e}")
 
             try:
+                sheet = connect_google_sheets()
                 ws = sheet.worksheet("Suggestions")
                 # Use current datetime (real or simulated)
-                current_timestamp = get_current_datetime(sheet)
+                current_timestamp = get_current_datetime()
                 # Get current sprint ID or use empty string if no sprint
                 sprint_id = current_sprint['sprint_id'] if current_sprint else ""
 
@@ -222,15 +222,15 @@ def render_suggest_movie(sheet):
 # ---------------------------------------
 # PAGE: VOTING
 # ---------------------------------------
-def render_voting(sheet):
+def render_voting():
     """Render the voting page"""
     if not st.session_state.enable_voting and st.session_state.role != "admin":
         st.warning("Voting page is currently disabled by admin.")
         return
 
     # Display sprint information in header
-    sprint_info = get_sprint_display_info(sheet)
-    current_sprint = get_current_sprint(sheet)
+    sprint_info = get_sprint_display_info()
+    current_sprint = get_current_sprint()
 
     if sprint_info and current_sprint:
         st.header(f"🗳️ Voting - {sprint_info['sprint_id']}")
@@ -242,19 +242,19 @@ def render_voting(sheet):
 
     # Show testing mode indicator
     from sprint_management import load_testing_config
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         st.info(f"🧪 Testing Mode: Using date {test_date}")
 
     voter_name = st.session_state.username
 
     # Check if user has already voted in this sprint
-    if has_user_voted_in_sprint(sheet, voter_name, current_sprint['sprint_id']):
+    if has_user_voted_in_sprint(voter_name, current_sprint['sprint_id']):
         st.success("✅ You have already voted for this sprint!")
         st.info("You can only vote once per sprint.")
         return
 
-    movies = load_sheet(sheet, "Suggestions")
+    movies = load_sheet("Suggestions")
 
     if current_sprint and movies:
         movies = [movie for movie in movies
@@ -278,8 +278,9 @@ def render_voting(sheet):
 
         if st.button("Submit Votes"):
             try:
+                sheet = connect_google_sheets()
                 ws = sheet.worksheet("Voting")
-                current_timestamp = get_current_datetime(sheet)
+                current_timestamp = get_current_datetime()
                 for movie_name, watched in votes_data:
                     ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
                 st.success("✅ Votes submitted!")
@@ -291,16 +292,16 @@ def render_voting(sheet):
 # ---------------------------------------
 # PAGE: RATE MOVIES
 # ---------------------------------------
-def render_rate_movies(sheet):
+def render_rate_movies():
     """Render the rate movies page"""
     if not st.session_state.enable_rating and st.session_state.role != "admin":
         st.warning("Rating page is currently disabled by admin.")
         return
 
     # Display sprint information in header
-    sprint_info = get_sprint_display_info(sheet)
-    current_sprint = get_current_sprint(sheet)
-    previous_sprint = get_previous_sprint(sheet)
+    sprint_info = get_sprint_display_info()
+    current_sprint = get_current_sprint()
+    previous_sprint = get_previous_sprint()
 
     # Determine which sprint to rate - previous sprint for rating
     rating_sprint = previous_sprint if previous_sprint else current_sprint
@@ -318,19 +319,19 @@ def render_rate_movies(sheet):
 
     # Show testing mode indicator
     from sprint_management import load_testing_config
-    testing_enabled, test_date = load_testing_config(sheet)
+    testing_enabled, test_date = load_testing_config()
     if testing_enabled:
         st.info(f"🧪 Testing Mode: Using date {test_date}")
 
     rater_name = st.session_state.username
 
     # Check if user has already rated this sprint's movies
-    if has_user_rated_sprint_movies(sheet, rater_name, rating_sprint['sprint_id']):
+    if has_user_rated_sprint_movies(rater_name, rating_sprint['sprint_id']):
         st.success("✅ You have already rated movies for this sprint!")
         st.info("You can only rate once per sprint.")
         return
 
-    movies = load_sheet(sheet, "Suggestions")
+    movies = load_sheet("Suggestions")
 
     if rating_sprint and movies:
         movies = [movie for movie in movies
@@ -355,8 +356,9 @@ def render_rate_movies(sheet):
 
         if st.button("Submit Ratings"):
             try:
+                sheet = connect_google_sheets()
                 ws = sheet.worksheet("Ratings")
-                current_timestamp = get_current_datetime(sheet)
+                current_timestamp = get_current_datetime()
 
                 for movie_name, rating, dnw in ratings_data:
                     # Append row with sprint information

@@ -30,16 +30,16 @@ def connect_google_sheets():
 # LOAD SHEETS SAFELY WITH CACHING
 # ---------------------------------------
 @st.cache_data(ttl=120)
-def load_sheet(sheet, sheet_name):
+def load_sheet(sheet_name):  # Remove sheet parameter
     try:
+        sheet = connect_google_sheets()  # Create sheet inside function
         return sheet.worksheet(sheet_name).get_all_records()
     except Exception as e:
         st.warning(f"Failed to load {sheet_name}: {e}")
         return []
 
-def reload_users(sheet):
-    """Reload users data from Google Sheets"""
-    users_data = load_sheet(sheet, "Users")
+def reload_users():  # Remove sheet parameter
+    users_data = load_sheet("Users")
     users_roles = {}
     users_list = []
     users_passwords = {}
