@@ -208,6 +208,13 @@ def render_voting():
         st.warning("Voting page is currently disabled by admin.")
         return
 
+    # Check if form should be hidden
+    if st.session_state.get('show_voting_form') is False:
+        st.success("✅ You have successfully voted for this sprint!")
+        st.info("Thank you for participating in the voting!")
+        st.balloons()
+        return
+
     # Display sprint information in header
     sprint_info = get_sprint_display_info()
     current_sprint = get_current_sprint()
@@ -273,13 +280,12 @@ def render_voting():
                 current_timestamp = get_current_datetime()
                 for movie_name, watched in votes_data:
                     ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
-                st.success("✅ Votes submitted!")
                 st.cache_data.clear()
-                st.empty()
-                st.success("✅ You have successfully voted for this sprint!")
-                st.info("Thank you for participating in the voting!")
-                st.balloons()
-                return  # Stop further execution
+
+                # Set flag to hide form
+                st.session_state.show_voting_form = False
+                st.rerun()  # This will rerun and skip the form rendering
+
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
 
