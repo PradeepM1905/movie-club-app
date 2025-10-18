@@ -79,7 +79,6 @@ def render_dashboard():
             item['Rank'] = i + 1
 
         df_leaderboard = pd.DataFrame(leaderboard_data)
-        st.table(df_leaderboard.style.set_properties(**{'text-align': 'center'}))
         st.dataframe(df_leaderboard, use_container_width=True, hide_index=True)
     else:
         st.info("No user data available.")
