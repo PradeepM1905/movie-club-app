@@ -278,17 +278,10 @@ def render_voting():
                 # Show success and use session state to redirect
                 st.success("✅ Votes submitted successfully!")
                 st.balloons()
-                st.session_state.redirect_to_dashboard = True
+                st.button("Submit Votes", disabled=True)  # Disabled button
 
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
-
-        # Add this check after the submit button
-        if st.session_state.get('redirect_to_dashboard'):
-            st.session_state.redirect_to_dashboard = False
-            # Use JavaScript to redirect
-            st.markdown("<script>window.location.href = 'app.py';</script>", unsafe_allow_html=True)
-            st.stop()
 
 
 # ---------------------------------------
