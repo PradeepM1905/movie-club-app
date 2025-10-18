@@ -277,7 +277,7 @@ def render_voting():
                 st.success("✅ Votes submitted!")
                 st.cache_data.clear()
                 st.session_state.votes_submitted = True
-                st.rerun()
+                st.stop()
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
 
