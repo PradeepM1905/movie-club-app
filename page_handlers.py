@@ -13,7 +13,7 @@ def render_dashboard():
     sprint_info = get_sprint_display_info()
     if sprint_info:
         st.header(f"🎬 Movie Club Dashboard - {sprint_info['sprint_id']}")
-        st.write(f"**{sprint_info['description']}** | {sprint_info['start_date']} to {sprint_info['end_date']}")
+        st.write(f"**{sprint_info['description']}** | {sprint_info['start_date']} to {sprint_info['end_date']} | {sprint_info['days_remaining']} days remaining")
     else:
         st.header("🎬 Movie Club Dashboard")
         st.warning("No active sprint found. Please check Sprints configuration.")
