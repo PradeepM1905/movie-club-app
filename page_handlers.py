@@ -13,7 +13,7 @@ def render_dashboard():
     sprint_info = get_sprint_display_info()
     if sprint_info:
         st.header(f"🎬 Movie Club Dashboard - {sprint_info['sprint_id']}")
-        st.write(f"**{sprint_info['description']}** | {sprint_info['start_date']} to {sprint_info['end_date']} | {sprint_info['days_remaining']} days remaining")
+        st.write(f"**{sprint_info['description']}** | {sprint_info['start_date']} to {sprint_info['end_date']}")
     else:
         st.header("🎬 Movie Club Dashboard")
         st.warning("No active sprint found. Please check Sprints configuration.")
@@ -24,32 +24,22 @@ def render_dashboard():
     if testing_enabled:
         st.info(f"🧪 Testing Mode Active - Using simulated date: {test_date}")
 
-    # Load all data
-    users_data = load_sheet("Users")
-    suggestions = load_sheet("Suggestions")
-    ratings = load_sheet("Ratings")
+    # Sprint Countdown Section
+    st.subheader("⏰ Sprint Progress")
 
-    # Convert to DataFrames
-    df_users = pd.DataFrame(users_data)
-    df_suggestions = pd.DataFrame(suggestions) if suggestions else pd.DataFrame()
-    df_ratings = pd.DataFrame(ratings) if ratings else pd.DataFrame()
+    if sprint_info:
+        # Progress bar for current sprint
+        progress = 100 - (sprint_info['days_remaining'] / sprint_info['total_days'] * 100)
+        st.progress(min(100, max(0, progress)) / 100)
+        st.caption(f"Current sprint progress: {progress:.1f}% ({sprint_info['total_days'] - sprint_info['days_remaining']} of {sprint_info['total_days']} days)")
+    else:
+        st.info("No active sprint found. Please check Sprints configuration.")
 
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Total Members", len(df_users))
-    with col2:
-        st.metric("Movies Suggested", len(df_suggestions) if not df_suggestions.empty else 0)
-    with col3:
-        if sprint_info:
-            st.metric("Days Remaining", sprint_info['days_remaining'])
-        else:
-            st.metric("Sprint Status", "No Active Sprint")
 
     st.markdown("---")
 
     # Leaderboard Section
-    st.subheader("🏆 Leaderboard")
+    st.subheader("🏆 Points Table")
 
     if not df_users.empty:
         # Create leaderboard from Users sheet points with proper error handling
@@ -123,26 +113,6 @@ def render_dashboard():
         st.info("No movies suggested yet.")
 
     st.markdown("---")
-
-    # Sprint Countdown Section
-    st.subheader("⏰ Sprint Progress")
-
-    if sprint_info:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Days until sprint end", sprint_info['days_remaining'])
-        with col2:
-            if sprint_info['days_remaining'] > 0:
-                st.write(f"Sprint ends in **{sprint_info['days_remaining']} days**")
-            else:
-                st.success("🎉 Sprint completed! Ready for finalization!")
-
-        # Progress bar for current sprint
-        progress = 100 - (sprint_info['days_remaining'] / sprint_info['total_days'] * 100)
-        st.progress(min(100, max(0, progress)) / 100)
-        st.caption(f"Current sprint progress: {progress:.1f}% ({sprint_info['total_days'] - sprint_info['days_remaining']} of {sprint_info['total_days']} days)")
-    else:
-        st.info("No active sprint found. Please check Sprints configuration.")
 
 # ---------------------------------------
 # PAGE: SUGGEST MOVIE
