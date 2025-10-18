@@ -10,7 +10,7 @@ def get_current_sprint():
     """Get the current active sprint based on date"""
     try:
         sprints_data = load_sheet("Sprints")
-        current_date = get_current_date(sheet)
+        current_date = get_current_date()
 
         for sprint in sprints_data:
             start_date = datetime.strptime(sprint['start_date'], '%Y-%m-%d').date()
@@ -36,7 +36,7 @@ def get_previous_sprint():
     """Get the previous sprint for rating purposes"""
     try:
         sprints_data = load_sheet("Sprints")
-        current_date = get_current_date(sheet)
+        current_date = get_current_date()
 
         # Sort sprints by end_date descending
         sorted_sprints = sorted(sprints_data,
