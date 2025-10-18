@@ -46,8 +46,6 @@ sheet = connect_google_sheets()
 # ---------------------------------------
 initialize_session_state()
 users_list, users_roles, users_passwords = reload_users()
-if "votes_submitted" not in st.session_state:
-    st.session_state.votes_submitted = False
 
 # Check if user is logged in
 if not st.session_state.logged_in:

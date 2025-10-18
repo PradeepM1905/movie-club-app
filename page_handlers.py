@@ -275,9 +275,7 @@ def render_voting():
                     ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
                 st.success("✅ Votes submitted!")
                 st.cache_data.clear()
-                # Set flag and show success immediately
-                st.session_state.votes_submitted = True
-                # Show success page right here
+                st.empty()
                 st.success("✅ You have successfully voted for this sprint!")
                 st.info("Thank you for participating in the voting!")
                 st.balloons()
