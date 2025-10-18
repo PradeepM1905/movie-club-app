@@ -208,13 +208,6 @@ def render_voting():
         st.warning("Voting page is currently disabled by admin.")
         return
 
-    # Check if form should be hidden
-    if st.session_state.get('show_voting_form') is False:
-        st.success("✅ You have successfully voted for this sprint!")
-        st.info("Thank you for participating in the voting!")
-        st.balloons()
-        return
-
     # Display sprint information in header
     sprint_info = get_sprint_display_info()
     current_sprint = get_current_sprint()
@@ -273,7 +266,6 @@ def render_voting():
             if len(votes_data) != len(movies):
                 st.error("❌ Please vote Yes or No for all movies before submitting!")
                 return
-
             try:
                 sheet = connect_google_sheets()
                 ws = sheet.worksheet("Voting")
@@ -282,9 +274,10 @@ def render_voting():
                     ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
                 st.cache_data.clear()
 
-                # Set flag to hide form
-                st.session_state.show_voting_form = False
-                st.rerun()  # This will rerun and skip the form rendering
+                # Show success and redirect
+                st.success("✅ Votes submitted successfully!")
+                st.balloons()
+                st.switch_page("app.py")  # Redirect to dashboard
 
             except Exception as e:
                 st.warning(f"Failed to submit votes: {e}")
