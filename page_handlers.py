@@ -102,69 +102,18 @@ def render_dashboard():
         quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
         suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
         
-        # Add custom CSS for better mobile experience
-        st.markdown("""
-        <style>
-        .movie-card {
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 20px;
-            background-color: #fafafa;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        }
-        
-        .movie-title {
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #1f1f1f;
-            margin-bottom: 4px;
-        }
-        
-        .suggested-by {
-            font-size: 0.9em;
-            color: #666;
-            font-style: italic;
-            margin-bottom: 12px;
-        }
-        
-        .section-header {
-            font-weight: 600;
-            color: #444;
-            margin-top: 12px;
-            margin-bottom: 6px;
-        }
-        
-        .quote-box {
-            background-color: #fff;
-            padding: 12px;
-            border-left: 3px solid #ff6b6b;
-            border-radius: 4px;
-            font-style: italic;
-            color: #555;
-            margin-bottom: 12px;
-        }
-        
-        .trivia-box {
-            background-color: #fff;
-            padding: 12px;
-            border-left: 3px solid #4ecdc4;
-            border-radius: 4px;
-            color: #444;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        # Display each movie as a full-width card
+        # Display each movie
         for movie_name, suggestion in suggestion_movies.items():
-            # Start movie card
-            st.markdown('<div class="movie-card">', unsafe_allow_html=True)
+            # Movie card container with border
+            st.markdown("""
+            <div style="border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 20px; background-color: #fafafa;">
+            """, unsafe_allow_html=True)
             
-            # Create columns: smaller for poster, larger for info
+            # ROW 1: Poster + Movie Info (in columns)
             col1, col2 = st.columns([1, 2])
             
             with col1:
-                # Movie poster with fixed width
+                # Movie poster
                 if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
                     st.image(
                         suggestion['image_url'], 
@@ -180,27 +129,38 @@ def render_dashboard():
             
             with col2:
                 # Movie title and suggested by
-                st.markdown(f'<div class="movie-title">{movie_name}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="suggested-by">Suggested by: {suggestion.get("user_name", "Unknown")}</div>', unsafe_allow_html=True)
+                st.write(f"**{movie_name}**")
+                st.write(f"*Suggested by: {suggestion.get('user_name', 'Unknown')}*")
             
-            # Quiz data section (full width below poster and title)
+            # ROW 2: Quote and Trivia (full width)
             if movie_name in quiz_movies:
                 quiz_info = quiz_movies[movie_name]
                 
                 # Best quote
                 quote = quiz_info.get('best_quote', 'No quote available')
                 if quote and quote != 'No quote available':
-                    st.markdown('<div class="section-header">💬 Best Quote</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
+                    st.markdown("---")
+                    st.markdown("**💬 Best Quote**")
+                    st.markdown(f'''
+                    <div style="background-color: #fff; padding: 12px; border-left: 3px solid #ff6b6b; 
+                    border-radius: 4px; font-style: italic; color: #555; margin-bottom: 12px;">
+                    "{quote}"
+                    </div>
+                    ''', unsafe_allow_html=True)
                 
                 # Fun trivia
                 trivia = quiz_info.get('fun_trivia', 'No trivia available')
                 if trivia and trivia != 'No trivia available':
-                    st.markdown('<div class="section-header">🎯 Fun Trivia</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="trivia-box">{trivia}</div>', unsafe_allow_html=True)
+                    st.markdown("**🎯 Fun Trivia**")
+                    st.markdown(f'''
+                    <div style="background-color: #fff; padding: 12px; border-left: 3px solid #4ecdc4; 
+                    border-radius: 4px; color: #444;">
+                    {trivia}
+                    </div>
+                    ''', unsafe_allow_html=True)
             
-            # End movie card
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Close movie card
+            st.markdown("</div>", unsafe_allow_html=True)
     
     elif previous_sprint and not quiz_data:
         st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
