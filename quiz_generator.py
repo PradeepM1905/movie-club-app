@@ -2,7 +2,7 @@ import os
 import json
 import requests
 from datetime import datetime, date
-from sheets_utils import connect_google_sheets, load_sheet
+from sheets_utils_gh import connect_google_sheets, load_sheet  # Instead of sheets_utils
 
 def get_previous_sprint_movies(current_date):
     """Get movies from the previous sprint"""
