@@ -88,7 +88,6 @@ def render_dashboard():
 
     st.subheader("📊 Last Sprint Highlights")
 
-    # Example placeholders (replace these with your actual data calls)
     quiz_data, previous_sprint = get_previous_sprint_quiz_data()
     previous_sprint_suggestions = get_movie_suggestions_for_sprint(previous_sprint['sprint_id']) if previous_sprint else []
     
@@ -98,79 +97,63 @@ def render_dashboard():
         quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
         suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
     
-        # Custom CSS for responsive cards
-        st.markdown("""
-        <style>
-        /* Make cards stack nicely on mobile */
-        .movie-card {
-            border: 1px solid #ddd;
-            border-radius: 15px;
-            padding: 16px;
-            margin-bottom: 25px;
-            background: linear-gradient(145deg, #ffffff, #f5f5f5);
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
-            transition: transform 0.2s ease;
-        }
-        .movie-card:hover {
-            transform: scale(1.01);
-            box-shadow: 2px 4px 15px rgba(0,0,0,0.1);
-        }
-        .movie-poster {
-            width: 100%;
-            border-radius: 10px;
-            margin-bottom: 10px;
-        }
-        .movie-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin-top: 5px;
-            text-align: center;
-        }
-        .movie-meta {
-            text-align: center;
-            color: #555;
-            font-size: 0.9rem;
-            margin-bottom: 10px;
-        }
-        .quote, .trivia {
-            margin-top: 12px;
-            font-size: 0.95rem;
-            color: #333;
-        }
-        @media (min-width: 700px) {
-            .movie-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 20px;
-            }
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    
-        # Responsive grid container
-        st.markdown("<div class='movie-grid'>", unsafe_allow_html=True)
-    
         for movie_name, suggestion in suggestion_movies.items():
             quiz_info = quiz_movies.get(movie_name, {})
-            quote = quiz_info.get('best_quote', '')
-            trivia = quiz_info.get('fun_trivia', '')
-    
-            poster_url = suggestion.get('image_url')
+            quote = quiz_info.get("best_quote", "")
+            trivia = quiz_info.get("fun_trivia", "")
+            poster_url = suggestion.get("image_url")
             if not poster_url or not pd.notna(poster_url) or not poster_url.strip():
-                poster_url = "https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster"
+                poster_url = "https://via.placeholder.com/200x300/333333/FFFFFF?text=No+Poster"
     
-            st.markdown(f"""
-            <div class="movie-card">
-                <img src="{poster_url}" class="movie-poster">
-                <div class="movie-title">{movie_name}</div>
-                <div class="movie-meta">Suggested by {suggestion.get('user_name', 'Unknown')}</div>
-                
-                {"<hr><div class='quote'><b>💬 Best Quote:</b><br><i>\"" + quote + "\"</i></div>" if quote else ""}
-                {"<hr><div class='trivia'><b>🎯 Fun Trivia:</b><br>" + trivia + "</div>" if trivia else ""}
-            </div>
-            """, unsafe_allow_html=True)
+            # Card container
+            with st.container():
+                st.markdown(
+                    """
+                    <style>
+                    .movie-card {
+                        background-color: #ffffff;
+                        border-radius: 15px;
+                        padding: 15px;
+                        margin-bottom: 20px;
+                        box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+                    }
+                    .movie-title {
+                        font-weight: 700;
+                        font-size: 18px;
+                        margin-top: 10px;
+                        text-align: center;
+                    }
+                    .movie-meta {
+                        text-align: center;
+                        color: #777;
+                        font-size: 14px;
+                        margin-bottom: 10px;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
     
-        st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("<div class='movie-card'>", unsafe_allow_html=True)
+    
+                # Center the poster
+                st.image(poster_url, use_container_width=True)
+    
+                # Movie name and suggester
+                st.markdown(f"<div class='movie-title'>{movie_name}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='movie-meta'>Suggested by {suggestion.get('user_name', 'Unknown')}</div>", unsafe_allow_html=True)
+    
+                # Quote
+                if quote:
+                    st.markdown("**💬 Best Quote**")
+                    st.caption(f"_{quote}_")
+    
+                # Trivia
+                if trivia:
+                    st.markdown("**🎯 Fun Trivia**")
+                    st.write(trivia)
+    
+                st.markdown("</div>", unsafe_allow_html=True)
     
     elif previous_sprint and not quiz_data:
         st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
