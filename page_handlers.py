@@ -599,11 +599,8 @@ def render_rate_movies():
 def get_previous_sprint_quiz_data():
     """Get quiz data for the previous sprint"""
     try:
-        st.write("🔍 Debug: Starting get_previous_sprint_quiz_data()")
-        
         # Load quiz data
         quiz_data = load_sheet("QuizInfo")
-        st.write(f"🔍 Debug: Loaded {len(quiz_data)} quiz records from QuizInfo")
         
         if not quiz_data:
             st.write("🔍 Debug: No quiz data found")
@@ -611,50 +608,34 @@ def get_previous_sprint_quiz_data():
         
         # Load sprints to find previous sprint
         sprints_data = load_sheet("Sprints")
-        st.write(f"🔍 Debug: Loaded {len(sprints_data)} sprints from Sprints sheet")
-        
         current_date = get_current_date()
-        st.write(f"🔍 Debug: Current date is {current_date}")
-        
         # Find previous sprint
         previous_sprint = None
-        st.write("🔍 Debug: Looking for previous sprint...")
         
         for sprint in sorted(sprints_data, key=lambda x: x['end_date'], reverse=True):
             end_date = datetime.datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
-            st.write(f"🔍 Debug: Checking sprint {sprint['sprint_id']} - end_date: {end_date}")
             
             if end_date < current_date:
                 previous_sprint = sprint
-                st.write(f"🔍 Debug: Found previous sprint: {sprint['sprint_id']}")
                 break
         
         if not previous_sprint:
-            st.write("🔍 Debug: No previous sprint found (all sprints are in future or no sprints)")
             return None, None
         
-        st.write(f"🔍 Debug: Previous sprint identified: {previous_sprint['sprint_id']}")
-        
+         
         # Find quiz data for previous sprint
-        st.write("🔍 Debug: Looking for quiz data for previous sprint...")
         for quiz in quiz_data:
-            st.write(f"🔍 Debug: Checking quiz record - sprint_id: {quiz.get('sprint_id')}")
             if quiz.get('sprint_id') == previous_sprint['sprint_id']:
-                st.write(f"🔍 Debug: Found matching quiz data for sprint {previous_sprint['sprint_id']}")
                 try:
                     quiz_json = json.loads(quiz.get('quiz_json', '{}'))
-                    st.write(f"🔍 Debug: Successfully parsed quiz JSON with {len(quiz_json.get('movies_quiz_data', []))} movies")
                     return quiz_json, previous_sprint
                 except json.JSONDecodeError as e:
-                    st.write(f"🔍 Debug: Failed to parse quiz JSON: {e}")
                     continue
         
-        st.write(f"🔍 Debug: No quiz data found for sprint {previous_sprint['sprint_id']}")
         return None, None
         
     except Exception as e:
         st.warning(f"Error loading previous sprint quiz: {e}")
-        st.write(f"🔍 Debug: Exception details: {type(e).__name__}: {e}")
         return None, None
 
 def get_movie_suggestions_for_sprint(sprint_id):
