@@ -85,6 +85,76 @@ def render_dashboard():
 
     st.markdown("---")
 
+    st.subheader("📊 Last Sprint Highlights")
+    
+    # Get previous sprint quiz data
+    quiz_data, previous_sprint = get_previous_sprint_quiz_data()
+    previous_sprint_suggestions = []
+    
+    if previous_sprint:
+        previous_sprint_suggestions = get_movie_suggestions_for_sprint(previous_sprint['sprint_id'])
+    
+    if quiz_data and previous_sprint_suggestions:
+        st.write(f"**{previous_sprint['sprint_id']}**: {previous_sprint.get('description', '')}")
+        
+        # Create a mapping of movie names to quiz data
+        quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
+        
+        # Create a mapping of movie names to suggestions (for user info and images)
+        suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
+        
+        # Display movies in a grid
+        cols = st.columns(3)
+        
+        for idx, (movie_name, suggestion) in enumerate(suggestion_movies.items()):
+            col_idx = idx % 3
+            with cols[col_idx]:
+                # Movie card container
+                with st.container():
+                    # Movie poster
+                    if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
+                        st.image(suggestion['image_url'], width=200, output_format="PNG")
+                    else:
+                        st.image("https://via.placeholder.com/200x300/333333/FFFFFF?text=No+Poster", 
+                                width=200, output_format="PNG")
+                    
+                    # Movie title and suggested by
+                    st.write(f"**{movie_name}**")
+                    st.write(f"*Suggested by: {suggestion.get('user_name', 'Unknown')}*")
+                    
+                    # Quiz data (if available)
+                    if movie_name in quiz_movies:
+                        quiz_info = quiz_movies[movie_name]
+                        
+                        # Best quote with nice formatting
+                        with st.expander("💬 Best Quote"):
+                            st.write(f"*\"{quiz_info.get('best_quote', 'No quote available')}\"*")
+                        
+                        # Fun trivia with nice formatting
+                        with st.expander("🎯 Fun Trivia"):
+                            st.write(quiz_info.get('fun_trivia', 'No trivia available'))
+                        
+                        # Questions (collapsed by default)
+                        with st.expander("❓ Quiz Questions", expanded=False):
+                            for q_idx, question in enumerate(quiz_info.get('multiple_choice_questions', [])):
+                                st.write(f"**Q{q_idx+1}:** {question['question']}")
+                                st.write(f"**Answer:** {question['correct_answer']}")
+                                if q_idx < len(quiz_info.get('multiple_choice_questions', [])) - 1:
+                                    st.markdown("---")
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                
+            # Create new columns every 3 movies for better layout
+            if (idx + 1) % 3 == 0 and (idx + 1) < len(suggestion_movies):
+                cols = st.columns(3)
+                
+    elif previous_sprint and not quiz_data:
+        st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
+    else:
+        st.info("No previous sprint data available yet.")
+
+    st.markdown("---")
+
     # Current Sprint Movies Section
     st.subheader("🎬 Current Sprint Movies")
 
@@ -521,3 +591,51 @@ def render_rate_movies():
                 st.rerun()
             except Exception as e:
                 st.warning(f"Failed to save ratings: {e}")
+
+
+
+def get_previous_sprint_quiz_data():
+    """Get quiz data for the previous sprint"""
+    try:
+        # Load quiz data
+        quiz_data = load_sheet("QuizInfo")
+        if not quiz_data:
+            return None, None
+        
+        # Load sprints to find previous sprint
+        sprints_data = load_sheet("Sprints")
+        current_date = get_current_date()
+        
+        # Find previous sprint
+        previous_sprint = None
+        for sprint in sorted(sprints_data, key=lambda x: x['end_date'], reverse=True):
+            end_date = datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
+            if end_date < current_date:
+                previous_sprint = sprint
+                break
+        
+        if not previous_sprint:
+            return None, None
+        
+        # Find quiz data for previous sprint
+        for quiz in quiz_data:
+            if quiz.get('sprint_id') == previous_sprint['sprint_id']:
+                try:
+                    quiz_json = json.loads(quiz.get('quiz_json', '{}'))
+                    return quiz_json, previous_sprint
+                except json.JSONDecodeError:
+                    continue
+        
+        return None, None
+        
+    except Exception as e:
+        st.warning(f"Error loading previous sprint quiz: {e}")
+        return None, None
+
+def get_movie_suggestions_for_sprint(sprint_id):
+    """Get movie suggestions with user info for a specific sprint"""
+    try:
+        suggestions = load_sheet("Suggestions")
+        return [s for s in suggestions if s.get('sprint') == sprint_id]
+    except:
+        return []
