@@ -104,6 +104,9 @@ def render_dashboard():
         
         # Display each movie
         for movie_name, suggestion in suggestion_movies.items():
+            # Add a divider at the top of each card
+            st.markdown("---")
+            
             # Create columns for the entire card content
             col1, col2 = st.columns([1, 3])
             
@@ -135,8 +138,7 @@ def render_dashboard():
                         st.markdown("**🎯 Fun Trivia**")
                         st.caption(trivia)
             
-            # Add spacing between cards
-            st.markdown("<br>", unsafe_allow_html=True)
+            # No extra spacing needed since we have divider
     
     elif previous_sprint and not quiz_data:
         st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
