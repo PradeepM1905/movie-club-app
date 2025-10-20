@@ -14,7 +14,7 @@ from finalize_sprint import render_finalize_sprint
 # ---------------------------------------
 # PAGE CONFIG
 # ---------------------------------------
-st.set_page_config(page_title="🎬 Movie-Club", page_icon="🎥", layout="wide")
+st.set_page_config(page_title="🎬 Movie-Club-", page_icon="🎥", layout="wide")
 
 # ---------------------------------------
 # LOAD SECRETS
