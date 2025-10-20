@@ -151,38 +151,9 @@ def can_edit_movie_suggestion(movie_name, user_name, sprint_id):
     2. OR if more than half of people voted it as seen already
     """
     today = datetime.datetime.now().date()
+    #TODO Add Rules
     
-    # Rule 1: First day of spring (March 20th)
-    if EDIT_CONFIG['enable_spring_first_day_edit']:
-        if today.month == 3 and today.day == 20:
-            return True
-    
-    # Rule 2: More than half voted as seen
-    try:
-        # Load voting data
-        voting_data = load_sheet("Voting")
-        if voting_data:
-            df_voting = pd.DataFrame(voting_data)
-            
-            # Filter votes for this specific movie in current sprint
-            movie_votes = df_voting[
-                (df_voting['movie_name'] == movie_name) & 
-                (df_voting.get('sprint', '') == sprint_id)
-            ]
-            
-            if not movie_votes.empty:
-                # Count votes where movie was marked as seen (True/Yes)
-                seen_votes_count = len(movie_votes[movie_votes['watched'] == True])
-                total_votes = len(movie_votes)
-                
-                if total_votes > 0:
-                    seen_ratio = seen_votes_count / total_votes
-                    if seen_ratio > EDIT_CONFIG['min_votes_ratio']:
-                        return True
-    except Exception as e:
-        st.warning(f"Error checking edit eligibility: {e}")
-    
-    return False
+    return True
 
 def get_user_movie_suggestion(user_name, sprint_id):
     """Get the movie suggestion made by a user in a specific sprint"""
