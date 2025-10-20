@@ -110,40 +110,41 @@ def render_dashboard():
         for idx, (movie_name, suggestion) in enumerate(suggestion_movies.items()):
             col_idx = idx % 3
             with cols[col_idx]:
-                # Movie card container
-                with st.container():
-                    # Movie poster
-                    if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
-                        st.image(suggestion['image_url'], width=200, output_format="PNG")
-                    else:
-                        st.image("https://via.placeholder.com/200x300/333333/FFFFFF?text=No+Poster", 
-                                width=200, output_format="PNG")
+                # Movie card container with border
+                st.markdown("""
+                <div style="border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 20px; background-color: #fafafa;">
+                """, unsafe_allow_html=True)
+                
+                # Movie poster
+                if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
+                    st.image(suggestion['image_url'], width=180, output_format="PNG")
+                else:
+                    st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster", 
+                            width=180, output_format="PNG")
+                
+                # Movie title and suggested by
+                st.write(f"**{movie_name}**")
+                st.write(f"*Suggested by: {suggestion.get('user_name', 'Unknown')}*")
+                
+                # Quiz data (if available)
+                if movie_name in quiz_movies:
+                    quiz_info = quiz_movies[movie_name]
                     
-                    # Movie title and suggested by
-                    st.write(f"**{movie_name}**")
-                    st.write(f"*Suggested by: {suggestion.get('user_name', 'Unknown')}*")
+                    # Best quote - always visible
+                    quote = quiz_info.get('best_quote', 'No quote available')
+                    if quote and quote != 'No quote available':
+                        st.markdown("---")
+                        st.markdown("**💬 Best Quote**")
+                        st.write(f"*\"{quote}\"*")
                     
-                    # Quiz data (if available)
-                    if movie_name in quiz_movies:
-                        quiz_info = quiz_movies[movie_name]
-                        
-                        # Best quote with nice formatting
-                        with st.expander("💬 Best Quote"):
-                            st.write(f"*\"{quiz_info.get('best_quote', 'No quote available')}\"*")
-                        
-                        # Fun trivia with nice formatting
-                        with st.expander("🎯 Fun Trivia"):
-                            st.write(quiz_info.get('fun_trivia', 'No trivia available'))
-                        
-                        # Questions (collapsed by default)
-                        with st.expander("❓ Quiz Questions", expanded=False):
-                            for q_idx, question in enumerate(quiz_info.get('multiple_choice_questions', [])):
-                                st.write(f"**Q{q_idx+1}:** {question['question']}")
-                                st.write(f"**Answer:** {question['correct_answer']}")
-                                if q_idx < len(quiz_info.get('multiple_choice_questions', [])) - 1:
-                                    st.markdown("---")
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    # Fun trivia - always visible
+                    trivia = quiz_info.get('fun_trivia', 'No trivia available')
+                    if trivia and trivia != 'No trivia available':
+                        st.markdown("---")
+                        st.markdown("**🎯 Fun Trivia**")
+                        st.write(trivia)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
                 
             # Create new columns every 3 movies for better layout
             if (idx + 1) % 3 == 0 and (idx + 1) < len(suggestion_movies):
