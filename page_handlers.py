@@ -104,63 +104,44 @@ def render_dashboard():
         
         # Display each movie
         for movie_name, suggestion in suggestion_movies.items():
-            # Movie card container with border
-            st.markdown("""
-            <div style="border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 20px; background-color: #fafafa;">
-            """, unsafe_allow_html=True)
-            
-            # ROW 1: Poster + Movie Info (in columns)
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                # Movie poster
-                if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
-                    st.image(
-                        suggestion['image_url'], 
-                        width=120,
-                        output_format="PNG"
-                    )
-                else:
-                    st.image(
-                        "https://via.placeholder.com/120x180/333333/FFFFFF?text=No+Poster", 
-                        width=120,
-                        output_format="PNG"
-                    )
-            
-            with col2:
-                # Movie title and suggested by
-                st.write(f"**{movie_name}**")
-                st.write(f"*Suggested by: {suggestion.get('user_name', 'Unknown')}*")
-            
-            # ROW 2: Quote and Trivia (full width)
-            if movie_name in quiz_movies:
-                quiz_info = quiz_movies[movie_name]
+            # Use container for better control
+            with st.container():
+                # Movie card with border - opening tag
+                st.markdown('<div style="border: 2px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 20px; background-color: #fafafa;">', unsafe_allow_html=True)
                 
-                # Best quote
-                quote = quiz_info.get('best_quote', 'No quote available')
-                if quote and quote != 'No quote available':
-                    st.markdown("---")
-                    st.markdown("**💬 Best Quote**")
-                    st.markdown(f'''
-                    <div style="background-color: #fff; padding: 12px; border-left: 3px solid #ff6b6b; 
-                    border-radius: 4px; font-style: italic; color: #555; margin-bottom: 12px;">
-                    "{quote}"
-                    </div>
-                    ''', unsafe_allow_html=True)
+                # ROW 1: Poster + Movie Info + Quote/Trivia (all in one row)
+                col1, col2 = st.columns([1, 3])
                 
-                # Fun trivia
-                trivia = quiz_info.get('fun_trivia', 'No trivia available')
-                if trivia and trivia != 'No trivia available':
-                    st.markdown("**🎯 Fun Trivia**")
-                    st.markdown(f'''
-                    <div style="background-color: #fff; padding: 12px; border-left: 3px solid #4ecdc4; 
-                    border-radius: 4px; color: #444;">
-                    {trivia}
-                    </div>
-                    ''', unsafe_allow_html=True)
-            
-            # Close movie card
-            st.markdown("</div>", unsafe_allow_html=True)
+                with col1:
+                    # Movie poster
+                    if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
+                        st.image(suggestion['image_url'], width=100, output_format="PNG")
+                    else:
+                        st.image("https://via.placeholder.com/100x150/333333/FFFFFF?text=No+Poster", width=100, output_format="PNG")
+                
+                with col2:
+                    # Movie title and suggested by (compact)
+                    st.markdown(f"**{movie_name}**")
+                    st.caption(f"Suggested by: {suggestion.get('user_name', 'Unknown')}")
+                    
+                    # Quiz data in same column (right side)
+                    if movie_name in quiz_movies:
+                        quiz_info = quiz_movies[movie_name]
+                        
+                        # Best quote (compact)
+                        quote = quiz_info.get('best_quote', 'No quote available')
+                        if quote and quote != 'No quote available':
+                            st.markdown("**💬 Best Quote**")
+                            st.caption(f'"{quote}"')
+                        
+                        # Fun trivia (compact)
+                        trivia = quiz_info.get('fun_trivia', 'No trivia available')
+                        if trivia and trivia != 'No trivia available':
+                            st.markdown("**🎯 Fun Trivia**")
+                            st.caption(trivia)
+                
+                # Close movie card - closing tag
+                st.markdown('</div>', unsafe_allow_html=True)
     
     elif previous_sprint and not quiz_data:
         st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
