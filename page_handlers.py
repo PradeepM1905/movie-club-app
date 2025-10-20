@@ -609,7 +609,7 @@ def get_previous_sprint_quiz_data():
         # Find previous sprint
         previous_sprint = None
         for sprint in sorted(sprints_data, key=lambda x: x['end_date'], reverse=True):
-            end_date = datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
+            end_date = datetime.datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
             if end_date < current_date:
                 previous_sprint = sprint
                 break
