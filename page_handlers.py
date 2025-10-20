@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import cloudinary.uploader
 from sheets_utils import load_sheet, connect_google_sheets
-from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime
+from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime, get_current_date
 from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
 # ---------------------------------------
 # PAGE: DASHBOARD
