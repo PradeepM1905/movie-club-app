@@ -40,4 +40,4 @@ jobs:
         auth_provider_x509_cert_url: ${{ secrets.GCP_AUTH_PROVIDER_CERT_URL }}
         client_x509_cert_url: ${{ secrets.GCP_CLIENT_CERT_URL }}
       run: |
-        python generate_quiz.py
+        python quiz_generator.py
