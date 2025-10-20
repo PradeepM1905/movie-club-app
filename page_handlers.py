@@ -87,7 +87,7 @@ def render_dashboard():
     st.markdown("---")
 
     st.subheader("📊 Last Sprint Highlights")
-    
+
     # Get previous sprint quiz data
     quiz_data, previous_sprint = get_previous_sprint_quiz_data()
     previous_sprint_suggestions = []
@@ -98,63 +98,156 @@ def render_dashboard():
     if quiz_data and previous_sprint_suggestions:
         st.write(f"**{previous_sprint['sprint_id']}**: {previous_sprint.get('description', '')}")
         
-        # Create a mapping of movie names to quiz data
+        # Create mappings
         quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
-        
-        # Create a mapping of movie names to suggestions (for user info and images)
         suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
         
-        # Display movies in a grid
-        cols = st.columns(3)
+        # Add custom CSS for better mobile experience
+        st.markdown("""
+        <style>
+        /* Mobile-first responsive design */
+        .movie-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
         
-        for idx, (movie_name, suggestion) in enumerate(suggestion_movies.items()):
-            col_idx = idx % 3
-            with cols[col_idx]:
-                # Movie card container with border
-                st.markdown("""
-                <div style="border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 20px; background-color: #fafafa;">
-                """, unsafe_allow_html=True)
-                
+        .movie-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        
+        .movie-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .movie-poster {
+            flex-shrink: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        .movie-info {
+            flex-grow: 1;
+            min-width: 0;
+        }
+        
+        .movie-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #1f1f1f;
+            margin: 0 0 8px 0;
+            line-height: 1.3;
+        }
+        
+        .suggested-by {
+            font-size: 0.9em;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .section-title {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #444;
+            margin: 16px 0 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .quote-text {
+            font-style: italic;
+            color: #555;
+            background-color: #fff;
+            padding: 12px 16px;
+            border-left: 3px solid #ff6b6b;
+            border-radius: 4px;
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+        
+        .trivia-text {
+            color: #444;
+            background-color: #fff;
+            padding: 12px 16px;
+            border-left: 3px solid #4ecdc4;
+            border-radius: 4px;
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+        
+        /* Responsive breakpoints */
+        @media (min-width: 768px) {
+            .movie-header {
+                gap: 20px;
+            }
+            .movie-title {
+                font-size: 1.3em;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Display each movie as a full-width card (mobile-friendly)
+        for movie_name, suggestion in suggestion_movies.items():
+            # Start movie card
+            st.markdown('<div class="movie-card">', unsafe_allow_html=True)
+            
+            # Create two columns for poster and basic info
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
                 # Movie poster
                 if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
-                    st.image(suggestion['image_url'], width=180, output_format="PNG")
+                    st.image(
+                        suggestion['image_url'], 
+                        use_container_width=True,
+                        output_format="PNG"
+                    )
                 else:
-                    st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster", 
-                            width=180, output_format="PNG")
-                
+                    st.image(
+                        "https://via.placeholder.com/300x450/333333/FFFFFF?text=No+Poster", 
+                        use_container_width=True,
+                        output_format="PNG"
+                    )
+            
+            with col2:
                 # Movie title and suggested by
-                st.write(f"**{movie_name}**")
-                st.write(f"*Suggested by: {suggestion.get('user_name', 'Unknown')}*")
+                st.markdown(f'<div class="movie-title">{movie_name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="suggested-by">Suggested by: {suggestion.get("user_name", "Unknown")}</div>', unsafe_allow_html=True)
+            
+            # Quiz data section (full width below)
+            if movie_name in quiz_movies:
+                quiz_info = quiz_movies[movie_name]
                 
-                # Quiz data (if available)
-                if movie_name in quiz_movies:
-                    quiz_info = quiz_movies[movie_name]
-                    
-                    # Best quote - always visible
-                    quote = quiz_info.get('best_quote', 'No quote available')
-                    if quote and quote != 'No quote available':
-                        st.markdown("---")
-                        st.markdown("**💬 Best Quote**")
-                        st.write(f"*\"{quote}\"*")
-                    
-                    # Fun trivia - always visible
-                    trivia = quiz_info.get('fun_trivia', 'No trivia available')
-                    if trivia and trivia != 'No trivia available':
-                        st.markdown("---")
-                        st.markdown("**🎯 Fun Trivia**")
-                        st.write(trivia)
+                # Best quote
+                quote = quiz_info.get('best_quote', 'No quote available')
+                if quote and quote != 'No quote available':
+                    st.markdown('<div class="section-title">💬 Best Quote</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="quote-text">"{quote}"</div>', unsafe_allow_html=True)
                 
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-            # Create new columns every 3 movies for better layout
-            if (idx + 1) % 3 == 0 and (idx + 1) < len(suggestion_movies):
-                cols = st.columns(3)
-                
+                # Fun trivia
+                trivia = quiz_info.get('fun_trivia', 'No trivia available')
+                if trivia and trivia != 'No trivia available':
+                    st.markdown('<div class="section-title">🎯 Fun Trivia</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="trivia-text">{trivia}</div>', unsafe_allow_html=True)
+            
+            # End movie card
+            st.markdown('</div>', unsafe_allow_html=True)
+    
     elif previous_sprint and not quiz_data:
         st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
     else:
         st.info("No previous sprint data available yet.")
-
     st.markdown("---")
 
     # Current Sprint Movies Section
