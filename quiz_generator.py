@@ -225,3 +225,18 @@ def generate_quiz_for_previous_sprint():
     else:
         print("❌ Failed to generate quiz")
         return False
+
+
+if __name__ == "__main__":
+    # Debug info
+    print("🚀 Starting quiz generator...")
+    print(f"GROQ_API_KEY exists: {bool(os.getenv('GROQ_API_KEY'))}")
+    print(f"GOOGLE_SHEET_URL exists: {bool(os.getenv('GOOGLE_SHEET_URL'))}")
+    
+    # Generate quiz
+    success = generate_quiz_for_previous_sprint()
+    
+    print(f"Script completed: {'SUCCESS' if success else 'NO ACTION TAKEN'}")
+    
+    # Exit with appropriate code for GitHub Actions
+    exit(0 if success else 1)
