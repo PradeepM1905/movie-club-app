@@ -129,8 +129,82 @@ def render_dashboard():
 # ---------------------------------------
 # PAGE: SUGGEST MOVIE
 # ---------------------------------------
+import streamlit as st
+import pandas as pd
+import cloudinary.uploader
+from sheets_utils import load_sheet, connect_google_sheets
+from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime
+from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
+import datetime
+
+# Add configuration for edit functionality at the top
+EDIT_CONFIG = {
+    'enable_spring_first_day_edit': True,  # Set to False to disable spring first day restriction
+    'min_votes_ratio': 0.5,               # Minimum ratio of votes needed to allow editing
+    'total_members': 10                    # Total members in the club (adjust based on your users)
+}
+
+def can_edit_movie_suggestion(movie_name, user_name, sprint_id):
+    """
+    Check if a movie suggestion can be edited based on the rules:
+    1. Only allowed on first day of spring (configurable)
+    2. OR if more than half of people voted it as seen already
+    """
+    today = datetime.datetime.now().date()
+    
+    # Rule 1: First day of spring (March 20th)
+    if EDIT_CONFIG['enable_spring_first_day_edit']:
+        if today.month == 3 and today.day == 20:
+            return True
+    
+    # Rule 2: More than half voted as seen
+    try:
+        # Load voting data
+        voting_data = load_sheet("Voting")
+        if voting_data:
+            df_voting = pd.DataFrame(voting_data)
+            
+            # Filter votes for this specific movie in current sprint
+            movie_votes = df_voting[
+                (df_voting['movie_name'] == movie_name) & 
+                (df_voting.get('sprint', '') == sprint_id)
+            ]
+            
+            if not movie_votes.empty:
+                # Count votes where movie was marked as seen (True/Yes)
+                seen_votes_count = len(movie_votes[movie_votes['watched'] == True])
+                total_votes = len(movie_votes)
+                
+                if total_votes > 0:
+                    seen_ratio = seen_votes_count / total_votes
+                    if seen_ratio > EDIT_CONFIG['min_votes_ratio']:
+                        return True
+    except Exception as e:
+        st.warning(f"Error checking edit eligibility: {e}")
+    
+    return False
+
+def get_user_movie_suggestion(user_name, sprint_id):
+    """Get the movie suggestion made by a user in a specific sprint"""
+    try:
+        suggestions = load_sheet("Suggestions")
+        if suggestions:
+            df_suggestions = pd.DataFrame(suggestions)
+            user_suggestion = df_suggestions[
+                (df_suggestions['user_name'] == user_name) & 
+                (df_suggestions['sprint'] == sprint_id)
+            ]
+            if not user_suggestion.empty:
+                return user_suggestion.iloc[0].to_dict()
+    except Exception as e:
+        st.warning(f"Error loading user suggestion: {e}")
+    return None
+
+# ---------------------------------------
+# PAGE: SUGGEST MOVIE (Updated with Edit functionality)
+# ---------------------------------------
 def render_suggest_movie():
-    """Render the suggest movie page"""
+    """Render the suggest movie page with edit functionality"""
     if not st.session_state.enable_suggestion and st.session_state.role != "admin":
         st.warning("Suggestion page is currently disabled by admin.")
         return
@@ -153,13 +227,51 @@ def render_suggest_movie():
         st.info(f"🧪 Testing Mode: Using date {test_date}")
 
     user_name = st.session_state.username
+    sprint_id = current_sprint['sprint_id'] if current_sprint else ""
 
     # Check if user has already suggested in this sprint
-    if current_sprint and has_user_suggested_in_sprint(user_name, current_sprint['sprint_id']):
-        st.success("✅ You have already suggested a movie for this sprint!")
-        st.info("You can only suggest one movie per sprint.")
-        return
+    existing_suggestion = None
+    if current_sprint:
+        existing_suggestion = get_user_movie_suggestion(user_name, sprint_id)
 
+    # Show edit option if user has existing suggestion and meets criteria
+    if existing_suggestion:
+        can_edit = can_edit_movie_suggestion(
+            existing_suggestion['movie_name'], 
+            user_name, 
+            sprint_id
+        )
+        
+        if can_edit:
+            st.success("✏️ You can edit your movie suggestion!")
+            if st.button("Edit My Suggestion"):
+                st.session_state.editing_suggestion = True
+                
+        if st.session_state.get('editing_suggestion'):
+            render_edit_suggestion(existing_suggestion, sprint_id)
+            return
+        else:
+            st.success("✅ You have already suggested a movie for this sprint!")
+            st.info("You can only suggest one movie per sprint.")
+            
+            # Show current suggestion details
+            st.subheader("Your Current Suggestion")
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                if existing_suggestion.get('image_url') and pd.notna(existing_suggestion['image_url']) and existing_suggestion['image_url'].strip():
+                    st.image(existing_suggestion['image_url'], width=150)
+                else:
+                    st.image("https://via.placeholder.com/150x225/333333/FFFFFF?text=No+Poster", width=150)
+            
+            with col2:
+                st.write(f"**{existing_suggestion.get('movie_name', 'Unknown Movie')}**")
+                st.write(f"**Genre:** {existing_suggestion.get('genre', 'Not specified')}")
+                st.write(f"**Where to watch:** {existing_suggestion.get('description', 'Not specified')}")
+            
+            return
+
+    # Original suggestion form (only show if no existing suggestion or during editing)
     movie_name = st.text_input("Movie Name")
     genre = st.text_input("Genre")
     description = st.text_area("Where to watch it?")
@@ -180,8 +292,8 @@ def render_suggest_movie():
             try:
                 sheet = connect_google_sheets()
                 ws = sheet.worksheet("Suggestions")
-                # Use current datetime (real or simulated)
                 current_timestamp = get_current_datetime()
+                
                 # Get current sprint ID or use empty string if no sprint
                 sprint_id = current_sprint['sprint_id'] if current_sprint else ""
 
@@ -200,6 +312,71 @@ def render_suggest_movie():
                 st.rerun()
             except Exception as e:
                 st.warning(f"Failed to write suggestion: {e}")
+
+def render_edit_suggestion(existing_suggestion, sprint_id):
+    """Render the edit suggestion form"""
+    st.subheader("✏️ Edit Your Movie Suggestion")
+    
+    # Pre-fill form with existing data
+    movie_name = st.text_input("Movie Name", value=existing_suggestion.get('movie_name', ''))
+    genre = st.text_input("Genre", value=existing_suggestion.get('genre', ''))
+    description = st.text_area("Where to watch it?", value=existing_suggestion.get('description', ''))
+    image = st.file_uploader("Upload New Poster (optional - leave empty to keep current)", 
+                           type=["png", "jpg", "jpeg"])
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Save Changes"):
+            if not movie_name:
+                st.error("Please provide a movie name!")
+            else:
+                # Use existing image URL unless new image is uploaded
+                image_url = existing_suggestion.get('image_url', '')
+                if image:
+                    try:
+                        result = cloudinary.uploader.upload(image)
+                        image_url = result.get('secure_url', '')
+                    except Exception as e:
+                        st.warning(f"Cloudinary upload failed: {e}")
+                
+                try:
+                    # Update the suggestion in Google Sheets
+                    sheet = connect_google_sheets()
+                    ws = sheet.worksheet("Suggestions")
+                    
+                    # Get all suggestions to find the row to update
+                    suggestions = ws.get_all_records()
+                    
+                    # Find the row index of the user's suggestion for this sprint
+                    for idx, suggestion in enumerate(suggestions, start=2):  # start=2 because of header row
+                        if (suggestion.get('user_name') == st.session_state.username and 
+                            suggestion.get('sprint') == sprint_id):
+                            
+                            # Update the row
+                            ws.update(f'A{idx}:G{idx}', [[
+                                sprint_id,
+                                st.session_state.username,
+                                movie_name,
+                                genre,
+                                description,
+                                image_url,
+                                str(get_current_datetime())  # Update timestamp
+                            ]])
+                            break
+                    
+                    st.success("✅ Movie suggestion updated successfully!")
+                    st.session_state.editing_suggestion = False
+                    st.cache_data.clear()
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.warning(f"Failed to update suggestion: {e}")
+    
+    with col2:
+        if st.button("Cancel Edit"):
+            st.session_state.editing_suggestion = False
+            st.rerun()
 
 # ---------------------------------------
 # PAGE: VOTING
