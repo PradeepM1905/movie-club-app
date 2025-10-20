@@ -105,118 +105,76 @@ def render_dashboard():
         # Add custom CSS for better mobile experience
         st.markdown("""
         <style>
-        /* Mobile-first responsive design */
         .movie-card {
             border: 1px solid #e0e0e0;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 24px;
-            background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .movie-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-        }
-        
-        .movie-header {
-            display: flex;
-            align-items: flex-start;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-        
-        .movie-poster {
-            flex-shrink: 0;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        
-        .movie-info {
-            flex-grow: 1;
-            min-width: 0;
+            padding: 16px;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }
         
         .movie-title {
             font-size: 1.1em;
             font-weight: 600;
             color: #1f1f1f;
-            margin: 0 0 8px 0;
-            line-height: 1.3;
+            margin-bottom: 4px;
         }
         
         .suggested-by {
             font-size: 0.9em;
             color: #666;
             font-style: italic;
+            margin-bottom: 12px;
         }
         
-        .section-title {
-            font-size: 0.95em;
+        .section-header {
             font-weight: 600;
             color: #444;
-            margin: 16px 0 8px 0;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            margin-top: 12px;
+            margin-bottom: 6px;
         }
         
-        .quote-text {
-            font-style: italic;
-            color: #555;
+        .quote-box {
             background-color: #fff;
-            padding: 12px 16px;
+            padding: 12px;
             border-left: 3px solid #ff6b6b;
             border-radius: 4px;
-            margin: 8px 0;
-            line-height: 1.5;
+            font-style: italic;
+            color: #555;
+            margin-bottom: 12px;
         }
         
-        .trivia-text {
-            color: #444;
+        .trivia-box {
             background-color: #fff;
-            padding: 12px 16px;
+            padding: 12px;
             border-left: 3px solid #4ecdc4;
             border-radius: 4px;
-            margin: 8px 0;
-            line-height: 1.5;
-        }
-        
-        /* Responsive breakpoints */
-        @media (min-width: 768px) {
-            .movie-header {
-                gap: 20px;
-            }
-            .movie-title {
-                font-size: 1.3em;
-            }
+            color: #444;
         }
         </style>
         """, unsafe_allow_html=True)
         
-        # Display each movie as a full-width card (mobile-friendly)
+        # Display each movie as a full-width card
         for movie_name, suggestion in suggestion_movies.items():
             # Start movie card
             st.markdown('<div class="movie-card">', unsafe_allow_html=True)
             
-            # Create two columns for poster and basic info
+            # Create columns: smaller for poster, larger for info
             col1, col2 = st.columns([1, 2])
             
             with col1:
-                # Movie poster
+                # Movie poster with fixed width
                 if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
                     st.image(
                         suggestion['image_url'], 
-                        use_container_width=True,
+                        width=120,
                         output_format="PNG"
                     )
                 else:
                     st.image(
-                        "https://via.placeholder.com/300x450/333333/FFFFFF?text=No+Poster", 
-                        use_container_width=True,
+                        "https://via.placeholder.com/120x180/333333/FFFFFF?text=No+Poster", 
+                        width=120,
                         output_format="PNG"
                     )
             
@@ -225,21 +183,21 @@ def render_dashboard():
                 st.markdown(f'<div class="movie-title">{movie_name}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="suggested-by">Suggested by: {suggestion.get("user_name", "Unknown")}</div>', unsafe_allow_html=True)
             
-            # Quiz data section (full width below)
+            # Quiz data section (full width below poster and title)
             if movie_name in quiz_movies:
                 quiz_info = quiz_movies[movie_name]
                 
                 # Best quote
                 quote = quiz_info.get('best_quote', 'No quote available')
                 if quote and quote != 'No quote available':
-                    st.markdown('<div class="section-title">💬 Best Quote</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="quote-text">"{quote}"</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="section-header">💬 Best Quote</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
                 
                 # Fun trivia
                 trivia = quiz_info.get('fun_trivia', 'No trivia available')
                 if trivia and trivia != 'No trivia available':
-                    st.markdown('<div class="section-title">🎯 Fun Trivia</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="trivia-text">{trivia}</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="section-header">🎯 Fun Trivia</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="trivia-box">{trivia}</div>', unsafe_allow_html=True)
             
             # End movie card
             st.markdown('</div>', unsafe_allow_html=True)
@@ -248,6 +206,8 @@ def render_dashboard():
         st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
     else:
         st.info("No previous sprint data available yet.")
+
+    
     st.markdown("---")
 
     # Current Sprint Movies Section
