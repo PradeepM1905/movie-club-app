@@ -87,7 +87,7 @@ def render_dashboard():
     st.markdown("---")
 
     st.subheader("📊 Last Sprint Highlights")
-    
+
     # Get previous sprint quiz data
     quiz_data, previous_sprint = get_previous_sprint_quiz_data()
     previous_sprint_suggestions = []
