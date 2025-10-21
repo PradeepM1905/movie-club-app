@@ -2,9 +2,11 @@ import streamlit as st
 import pandas as pd
 import cloudinary.uploader
 import json
+import time
 from sheets_utils import load_sheet, connect_google_sheets
 from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime, get_current_date
 from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
+
 # ---------------------------------------
 # PAGE: DASHBOARD
 # ---------------------------------------
@@ -142,8 +144,43 @@ def render_dashboard():
     else:
         st.info("No previous sprint data available yet.")
 
+
+    st.markdown("---")
+
+    # Quiz Section
+    st.subheader("🎯 Sprint Quiz")
+    quiz_data, previous_sprint = get_previous_sprint_quiz_data()
+    
+    if quiz_data and previous_sprint:
+        # Check if user already attempted the quiz
+        quiz_attempted = check_quiz_attempt(previous_sprint['sprint_id'])
+        
+        if quiz_attempted:
+            st.warning("✅ You have already attempted this sprint's quiz!")
+            # Show previous score
+            previous_score = get_previous_quiz_score(previous_sprint['sprint_id'])
+            if previous_score is not None:
+                total_questions = sum(len(movie.get('multiple_choice_questions', [])) 
+                                    for movie in quiz_data.get('movies_quiz_data', []))
+                st.write(f"Your score: **{previous_score}/{total_questions}**")
+        else:
+            st.write("Test your knowledge about the movies from the last sprint!")
+            st.write(f"**{previous_sprint['sprint_id']}** - {previous_sprint.get('description', '')}")
+            
+            # Count total questions
+            total_questions = sum(len(movie.get('multiple_choice_questions', [])) 
+                                for movie in quiz_data.get('movies_quiz_data', []))
+            st.write(f"**{total_questions} questions** • **20 seconds per question** • **No retries**")
+            
+            if st.button("🚀 Take Quiz Now", type="primary"):
+                st.session_state.show_quiz = True
+                st.rerun()
+    else:
+        st.info("No quiz available for previous sprint yet.")
     
     st.markdown("---")
+
+    
 
     # Current Sprint Movies Section
     st.subheader("🎬 Current Sprint Movies")
@@ -633,3 +670,204 @@ def get_movie_suggestions_for_sprint(sprint_id):
         return [s for s in suggestions if s.get('sprint') == sprint_id]
     except:
         return []
+
+
+def render_quiz_interface(quiz_data, previous_sprint):
+    """Render the quiz interface in a modal/popup style"""
+    # Initialize quiz state
+    if 'quiz_started' not in st.session_state:
+        st.session_state.quiz_started = True
+        st.session_state.current_question = 0
+        st.session_state.user_answers = []
+        st.session_state.quiz_score = 0
+        st.session_state.time_remaining = 20
+        st.session_state.quiz_completed = False
+    
+    # Get all questions from all movies
+    all_questions = []
+    for movie in quiz_data.get('movies_quiz_data', []):
+        for question in movie.get('multiple_choice_questions', []):
+            all_questions.append(question)
+    
+    total_questions = len(all_questions)
+    
+    # Quiz header
+    st.header(f"🎯 Movie Quiz - {previous_sprint['sprint_id']}")
+    st.write(f"**{total_questions} questions • 20 seconds per question • No retries**")
+    st.markdown("---")
+    
+    # Progress bar
+    progress = (st.session_state.current_question) / total_questions
+    st.progress(progress)
+    st.write(f"Question {st.session_state.current_question + 1} of {total_questions}")
+    
+    # Timer display
+    timer_placeholder = st.empty()
+    
+    # If quiz completed, show results
+    if st.session_state.quiz_completed:
+        show_quiz_results(all_questions, previous_sprint)
+        return
+    
+    # Current question
+    current_q = all_questions[st.session_state.current_question]
+    
+    # Display question
+    st.subheader(f"Q{st.session_state.current_question + 1}: {current_q['question']}")
+    
+    # Display options
+    selected_option = st.radio(
+        "Select your answer:",
+        options=current_q['options'],
+        key=f"question_{st.session_state.current_question}"
+    )
+    
+    # Timer logic
+    if st.session_state.time_remaining > 0:
+        with timer_placeholder.container():
+            st.warning(f"⏰ Time remaining: {st.session_state.time_remaining} seconds")
+        
+        # Simulate timer (this is simplified - in real implementation, we'd need more complex timing)
+        time.sleep(1)
+        st.session_state.time_remaining -= 1
+        
+        # Auto-submit when time runs out
+        if st.session_state.time_remaining == 0:
+            handle_answer_submission(None, current_q, all_questions, previous_sprint)
+            st.rerun()
+    else:
+        # Time's up - show correct answer
+        st.error("⏰ Time's up!")
+        st.info(f"**Correct answer:** {current_q['correct_answer']}")
+        
+        if st.button("Next Question →", key="timeout_next"):
+            handle_answer_submission(None, current_q, all_questions, previous_sprint)
+            st.rerun()
+    
+    # Manual submit button (if user answers before time runs out)
+    if selected_option and st.button("Submit Answer", type="primary"):
+        handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
+        st.rerun()
+
+def handle_answer_submission(selected_option, current_question, all_questions, previous_sprint):
+    """Handle answer submission and scoring"""
+    # Calculate score
+    is_correct = False
+    if selected_option:
+        is_correct = (selected_option == current_question['correct_answer'])
+    
+    # Store user answer
+    st.session_state.user_answers.append({
+        'question': current_question['question'],
+        'user_answer': selected_option or "No answer (timeout)",
+        'correct_answer': current_question['correct_answer'],
+        'is_correct': is_correct
+    })
+    
+    # Update score
+    if is_correct:
+        st.session_state.quiz_score += 1
+    
+    # Move to next question or complete quiz
+    st.session_state.current_question += 1
+    st.session_state.time_remaining = 20  # Reset timer for next question
+    
+    if st.session_state.current_question >= len(all_questions):
+        st.session_state.quiz_completed = True
+        save_quiz_result(previous_sprint)
+
+def show_quiz_results(all_questions, previous_sprint):
+    """Display quiz results"""
+    st.success("🎉 Quiz Completed!")
+    st.subheader(f"Your Score: {st.session_state.quiz_score}/{len(all_questions)}")
+    
+    # Score breakdown
+    st.markdown("---")
+    st.subheader("📊 Detailed Results")
+    
+    for i, answer in enumerate(st.session_state.user_answers):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write(f"**Q{i+1}:** {answer['question']}")
+            st.write(f"**Your answer:** {answer['user_answer']}")
+            st.write(f"**Correct answer:** {answer['correct_answer']}")
+        with col2:
+            if answer['is_correct']:
+                st.success("✅ Correct")
+            else:
+                st.error("❌ Incorrect")
+        st.markdown("---")
+    
+    # Restart/Close buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Take Quiz Again"):
+            # Reset quiz state
+            for key in ['quiz_started', 'current_question', 'user_answers', 
+                       'quiz_score', 'time_remaining', 'quiz_completed']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    with col2:
+        if st.button("🏠 Back to Dashboard"):
+            # Close quiz and return to dashboard
+            for key in ['quiz_started', 'current_question', 'user_answers', 
+                       'quiz_score', 'time_remaining', 'quiz_completed', 'show_quiz']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+
+def save_quiz_result(previous_sprint):
+    """Save quiz result to Google Sheets"""
+    try:
+        sheet = connect_google_sheets()
+        
+        # Try to get existing QuizResult sheet, create if it doesn't exist
+        try:
+            result_ws = sheet.worksheet("QuizResult")
+        except:
+            result_ws = sheet.add_worksheet(title="QuizResult", rows="1000", cols="4")
+            # Add headers
+            result_ws.append_row(["sprint_id", "username", "points", "timestamp"])
+        
+        # Save the result
+        result_ws.append_row([
+            previous_sprint['sprint_id'],
+            st.session_state.username,
+            st.session_state.quiz_score,
+            str(get_current_datetime())
+        ])
+        
+        st.success("✅ Quiz result saved!")
+        
+    except Exception as e:
+        st.warning(f"Could not save quiz result: {e}")
+
+
+def check_quiz_attempt(sprint_id):
+    """Check if user has already attempted the quiz for this sprint"""
+    try:
+        quiz_results = load_sheet("QuizResult")
+        username = st.session_state.username
+        
+        for result in quiz_results:
+            if (result.get('sprint_id') == sprint_id and 
+                result.get('username') == username):
+                return True
+        return False
+    except:
+        return False
+
+def get_previous_quiz_score(sprint_id):
+    """Get user's previous quiz score for this sprint"""
+    try:
+        quiz_results = load_sheet("QuizResult")
+        username = st.session_state.username
+        
+        for result in quiz_results:
+            if (result.get('sprint_id') == sprint_id and 
+                result.get('username') == username):
+                return int(result.get('points', 0))
+        return None
+    except:
+        return None
