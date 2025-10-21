@@ -50,6 +50,7 @@ def render_dashboard():
         st.info("No active sprint found. Please check Sprints configuration.")
 
 
+    # CACHE DASHBOARD DATA to prevent repeated API calls
     if 'dashboard_data_loaded' not in st.session_state:
         st.session_state.quiz_data, st.session_state.previous_sprint = get_previous_sprint_quiz_data()
         st.session_state.dashboard_data_loaded = True
@@ -57,7 +58,7 @@ def render_dashboard():
     # Use cached data
     quiz_data = st.session_state.quiz_data
     previous_sprint = st.session_state.previous_sprint
-
+    
     # QUIZ MODAL CHECK
     if st.session_state.get('show_quiz'):
         if quiz_data and previous_sprint:
@@ -721,6 +722,15 @@ def get_movie_suggestions_for_sprint(sprint_id):
 
 def render_quiz_interface(quiz_data, previous_sprint):
     """Render the quiz interface with real-time countdown timer"""
+    # CACHE THE QUIZ DATA to prevent repeated API calls
+    if 'cached_quiz_data' not in st.session_state:
+        st.session_state.cached_quiz_data = quiz_data
+        st.session_state.cached_previous_sprint = previous_sprint
+    else:
+        # Use cached data instead of the passed parameters (which might trigger API calls)
+        quiz_data = st.session_state.cached_quiz_data
+        previous_sprint = st.session_state.cached_previous_sprint
+    
     # Initialize quiz state
     if 'quiz_started' not in st.session_state:
         st.session_state.quiz_started = True
@@ -731,7 +741,7 @@ def render_quiz_interface(quiz_data, previous_sprint):
         st.session_state.time_remaining = 20
         st.session_state.question_start_time = time.time()
     
-    # Get all questions
+    # Get all questions FROM CACHED DATA
     all_questions = []
     for movie in quiz_data.get('movies_quiz_data', []):
         for question in movie.get('multiple_choice_questions', []):
@@ -906,6 +916,13 @@ def save_quiz_result(previous_sprint):
     except Exception as e:
         st.warning(f"Could not save quiz result: {e}")
 
+def clear_quiz_cache():
+    """Clear quiz-related cache but keep the main data"""
+    cache_keys = ['quiz_started', 'current_question', 'user_answers', 'quiz_score', 
+                  'time_remaining', 'quiz_completed', 'question_start_time', 'show_quiz']
+    for key in cache_keys:
+        if key in st.session_state:
+            del st.session_state[key]
 
 def check_quiz_attempt(sprint_id):
     """Check if user has already attempted the quiz for this sprint"""
