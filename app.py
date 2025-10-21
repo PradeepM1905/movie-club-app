@@ -138,6 +138,19 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 # ---------------------------------------
+# QUIZ MODAL CHECK
+# ---------------------------------------
+if st.session_state.get('show_quiz'):
+    quiz_data, previous_sprint = get_previous_sprint_quiz_data()
+    if quiz_data and previous_sprint:
+        render_quiz_interface(quiz_data, previous_sprint)
+        st.stop()
+    else:
+        # If no quiz data, remove the quiz state and continue to dashboard
+        if 'show_quiz' in st.session_state:
+            del st.session_state['show_quiz']
+            
+# ---------------------------------------
 # PAGE ROUTING
 # ---------------------------------------
 if selected == "Dashboard":
