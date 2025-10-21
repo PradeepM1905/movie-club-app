@@ -114,6 +114,44 @@ def load_testing_config():
         # If Testing sheet doesn't exist or has errors, return normal mode
         return False, date.today()
 
+def get_previous_sprint_quiz_data():
+    """Get quiz data for the previous sprint"""
+    try:
+        # Load quiz data
+        quiz_data = load_sheet("QuizInfo")
+        if not quiz_data:
+            return None, None
+        
+        # Load sprints to find previous sprint
+        sprints_data = load_sheet("Sprints")
+        current_date = get_current_date()
+        
+        # Find previous sprint
+        previous_sprint = None
+        for sprint in sorted(sprints_data, key=lambda x: x['end_date'], reverse=True):
+            end_date = datetime.datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
+            if end_date < current_date:
+                previous_sprint = sprint
+                break
+        
+        if not previous_sprint:
+            return None, None
+        
+        # Find quiz data for previous sprint
+        for quiz in quiz_data:
+            if quiz.get('sprint_id') == previous_sprint['sprint_id']:
+                try:
+                    quiz_json = json.loads(quiz.get('quiz_json', '{}'))
+                    return quiz_json, previous_sprint
+                except json.JSONDecodeError:
+                    continue
+        
+        return None, None
+        
+    except Exception as e:
+        print(f"Error loading previous sprint quiz: {e}")
+        return None, None
+
 def get_current_date():
     """Get current date - either real or from testing configuration"""
     testing_enabled, test_date = load_testing_config()
