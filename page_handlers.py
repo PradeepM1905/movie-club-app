@@ -96,9 +96,6 @@ def render_dashboard():
         previous_sprint_suggestions = get_movie_suggestions_for_sprint(previous_sprint['sprint_id'])
     
     if quiz_data and previous_sprint_suggestions:
-        st.write(f"**{previous_sprint['sprint_id']}**: {previous_sprint.get('description', '')}")
-        
-        # Create mappings
         quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
         suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
         
