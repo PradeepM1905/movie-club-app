@@ -636,7 +636,16 @@ def get_movie_suggestions_for_sprint(sprint_id):
 
 def render_quiz_interface(quiz_data, previous_sprint):
     """Render the quiz interface in a modal/popup style"""
-    # Initialize quiz state
+    # Store quiz data in session state to avoid reloading
+    if 'cached_quiz_data' not in st.session_state:
+        st.session_state.cached_quiz_data = quiz_data
+        st.session_state.cached_previous_sprint = previous_sprint
+    else:
+        # Use cached data instead of reloading
+        quiz_data = st.session_state.cached_quiz_data
+        previous_sprint = st.session_state.cached_previous_sprint
+    
+    # Initialize ALL quiz state variables
     if 'quiz_started' not in st.session_state:
         st.session_state.quiz_started = True
         st.session_state.current_question = 0
@@ -644,9 +653,9 @@ def render_quiz_interface(quiz_data, previous_sprint):
         st.session_state.quiz_score = 0
         st.session_state.time_remaining = 20
         st.session_state.quiz_completed = False
-        st.session_state.last_update_time = time.time()
+        st.session_state.question_start_time = time.time()
     
-    # Get all questions from all movies
+    # Get all questions from all movies (from cached data)
     all_questions = []
     for movie in quiz_data.get('movies_quiz_data', []):
         for question in movie.get('multiple_choice_questions', []):
@@ -664,14 +673,16 @@ def render_quiz_interface(quiz_data, previous_sprint):
     st.progress(progress)
     st.write(f"Question {st.session_state.current_question + 1} of {total_questions}")
     
-    # Timer logic - update based on actual time passed
+    # Calculate time remaining
     current_time = time.time()
-    time_elapsed = current_time - st.session_state.last_update_time
-    st.session_state.time_remaining = max(0, st.session_state.time_remaining - int(time_elapsed))
-    st.session_state.last_update_time = current_time
+    elapsed_time = current_time - st.session_state.question_start_time
+    time_remaining = max(0, 20 - int(elapsed_time))
     
     # Timer display
-    timer_placeholder = st.empty()
+    if time_remaining > 0:
+        st.warning(f"⏰ Time remaining: {time_remaining} seconds")
+    else:
+        st.error("⏰ Time's up!")
     
     # If quiz completed, show results
     if st.session_state.quiz_completed:
@@ -691,29 +702,16 @@ def render_quiz_interface(quiz_data, previous_sprint):
         key=f"question_{st.session_state.current_question}"
     )
     
-    # Timer display and auto-submit
-    with timer_placeholder.container():
-        if st.session_state.time_remaining > 0:
-            st.warning(f"⏰ Time remaining: {st.session_state.time_remaining} seconds")
-        else:
-            st.error("⏰ Time's up!")
-    
-    # Auto-submit when time runs out
-    if st.session_state.time_remaining <= 0:
+    # Handle submissions WITHOUT auto-refresh
+    if time_remaining <= 0:
         st.info(f"**Correct answer:** {current_q['correct_answer']}")
-        
         if st.button("Next Question →", key="timeout_next"):
             handle_answer_submission(None, current_q, all_questions, previous_sprint)
             st.rerun()
     else:
-        # Manual submit button (if user answers before time runs out)
         if selected_option and st.button("Submit Answer", type="primary"):
             handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
             st.rerun()
-        
-        # Auto-refresh for timer (this will cause a brief flash but keep timer updated)
-        time.sleep(0.5)  # Small delay to prevent too frequent refreshes
-        st.rerun()
 
 def handle_answer_submission(selected_option, current_question, all_questions, previous_sprint):
     """Handle answer submission and scoring"""
