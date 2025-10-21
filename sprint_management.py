@@ -153,7 +153,7 @@ def get_previous_sprint_quiz_data():
         print("🔍 [get_previous_sprint_quiz_data] Looking for previous sprint...")
         
         for sprint in sorted(sprints_data, key=lambda x: x['end_date'], reverse=True):
-            end_date = datetime.datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
+            end_date = end_date = datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
             print(f"🔍 [get_previous_sprint_quiz_data] Checking sprint {sprint['sprint_id']}: end_date={end_date}, is_before_current={end_date < current_date}")
             
             if end_date < current_date:
