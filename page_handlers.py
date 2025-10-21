@@ -94,45 +94,16 @@ def render_dashboard():
     # Get previous sprint quiz data
     quiz_data, previous_sprint = get_previous_sprint_quiz_data()
     previous_sprint_suggestions = []
-    
-    st.write("🔍 Debug - Last Sprint Highlights:")
-    st.write(f"quiz_data: {quiz_data is not None}")
-    st.write(f"previous_sprint: {previous_sprint is not None}")
-    
     if previous_sprint:
-        st.write(f"🔍 Previous sprint found: {previous_sprint['sprint_id']}")
         previous_sprint_suggestions = get_movie_suggestions_for_sprint(previous_sprint['sprint_id'])
-        st.write(f"🔍 Found {len(previous_sprint_suggestions)} suggestions for sprint {previous_sprint['sprint_id']}")
-        
-        # Debug: Show what movies are in suggestions
-        if previous_sprint_suggestions:
-            st.write("🔍 Movies in suggestions:")
-            for suggestion in previous_sprint_suggestions:
-                st.write(f"  - {suggestion.get('movie_name')} by {suggestion.get('user_name')}")
     else:
         st.write("🔍 No previous sprint found")
     
     if quiz_data and previous_sprint_suggestions:
-        st.write("🔍 Both quiz_data and suggestions available - displaying content")
-        
-        # Debug quiz data structure
-        st.write(f"🔍 Quiz data keys: {list(quiz_data.keys()) if quiz_data else 'None'}")
-        if 'movies_quiz_data' in quiz_data:
-            st.write(f"🔍 Number of movies in quiz: {len(quiz_data['movies_quiz_data'])}")
-            st.write("🔍 Movies in quiz data:")
-            for movie in quiz_data['movies_quiz_data']:
-                st.write(f"  - {movie.get('movie_name')}")
-        
+       if 'movies_quiz_data' in quiz_data:
         quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
         suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
-        
-        # Debug matching
-        st.write("🔍 Movie matching:")
-        st.write(f"  - Movies in quiz: {list(quiz_movies.keys())}")
-        st.write(f"  - Movies in suggestions: {list(suggestion_movies.keys())}")
-        
         matching_movies = set(quiz_movies.keys()) & set(suggestion_movies.keys())
-        st.write(f"  - Matching movies: {list(matching_movies)}")
         
         # Display each movie
         for movie_name, suggestion in suggestion_movies.items():
@@ -171,17 +142,11 @@ def render_dashboard():
                         st.caption(trivia)
                 else:
                     st.caption("⚠️ No quiz data for this movie")
-            
-            # No extra spacing needed since we have divider
-    
     elif previous_sprint and not quiz_data:
-        st.write(f"🔍 Case: Previous sprint exists but no quiz data")
         st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
     elif quiz_data and not previous_sprint_suggestions:
-        st.write(f"🔍 Case: Quiz data exists but no suggestions for previous sprint")
         st.info("No movie suggestions found for the previous sprint.")
     else:
-        st.write(f"🔍 Case: Neither quiz data nor previous sprint available")
         st.info("No previous sprint data available yet.")
 
 
