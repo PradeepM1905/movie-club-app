@@ -782,32 +782,36 @@ def render_quiz_interface(quiz_data, previous_sprint):
         with st.expander(f"Question {i+1}: {question_data['question'][:50]}...", expanded=False):
             st.write(f"**{question_data['question']}**")
             
+            # Get current selection or None
+            current_selection = st.session_state.user_answers[i]
+            
             # Display options
             selected_option = st.radio(
                 f"Select your answer for Q{i+1}:",
                 options=question_data['options'],
                 key=f"question_{i}",
-                index=None  # Start with no selection
+                index=question_data['options'].index(current_selection) if current_selection in question_data['options'] else None
             )
             
             # Store the answer
-            if selected_option:
+            if selected_option and selected_option != current_selection:
                 st.session_state.user_answers[i] = selected_option
                 st.success("✓ Answer saved")
-            elif st.session_state.user_answers[i] is not None:
-                st.info(f"Current selection: {st.session_state.user_answers[i]}")
+            elif current_selection:
+                st.info(f"Current selection: {current_selection}")
             else:
                 st.warning("⏳ Not answered yet")
     
     st.markdown("---")
     
-    # Submit button
+    # Submit button logic - FIXED
+    answered_count = sum(1 for answer in st.session_state.user_answers if answer is not None)
+    
     col1, col2, col3 = st.columns([2, 1, 1])
     
     with col1:
-        answered_count = sum(1 for answer in st.session_state.user_answers if answer is not None)
         if answered_count == total_questions:
-            st.success(f"✅ All {total_questions} questions answered!")
+            st.success(f"✅ All {total_questions} questions answered! Ready to submit.")
         else:
             st.warning(f"📝 {answered_count}/{total_questions} questions answered")
     
@@ -816,15 +820,22 @@ def render_quiz_interface(quiz_data, previous_sprint):
             st.rerun()
     
     with col3:
-        submit_disabled = (time_remaining <= 0) or (answered_count == total_questions)
+        # FIXED: Enable submit when ALL questions are answered OR time is up
+        submit_disabled = (answered_count < total_questions) and (time_remaining > 0)
+        
         if st.button("🚀 Submit Quiz", type="primary", disabled=submit_disabled):
             calculate_and_show_results(all_questions, previous_sprint)
     
-    # Auto-submit when time runs out
-    if time_remaining <= 0 and not st.session_state.quiz_completed:
+    # Auto-submit when time runs out (if at least one question answered)
+    if time_remaining <= 0 and not st.session_state.quiz_completed and answered_count > 0:
         st.error("⏰ Time's up! Your quiz will be automatically submitted.")
         if st.button("Submit Now", key="auto_submit"):
             calculate_and_show_results(all_questions, previous_sprint)
+        # Auto-submit after 3 seconds
+        time.sleep(3)
+        if not st.session_state.quiz_completed:
+            calculate_and_show_results(all_questions, previous_sprint)
+            st.rerun()
 
 def calculate_and_show_results(all_questions, previous_sprint):
     """Calculate scores and show results"""
