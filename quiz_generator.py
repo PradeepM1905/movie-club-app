@@ -63,6 +63,15 @@ def generate_ai_quiz(movies_data, sprint_id):
     2. One best quote from the movie
     3. One fun trivia fact about the movie
     
+    CRITICAL REQUIREMENTS FOR QUESTIONS:
+    - DO NOT create generic questions like "What is the plot?", "Where does the story take place?", "Who is the main character?", "Who directed this movie?", "Who acted in this movie?"
+    - Create SPECIFIC and INTERESTING questions about plot details, memorable scenes, character motivations, or unique aspects
+    - Questions should test DEEPER knowledge of the movie, not basic facts
+    - Example good question: "What is the name of the water planet in Interstellar where one hour equals seven years on Earth?"
+    - Example good question: "In Inception, what personal item does Cobb use to test if he's in reality or a dream?"
+    - Example good question: "What object does Andy Dufresne use to hide his escape tunnel in Shawshank Redemption?"
+    
+    FORMAT REQUIREMENTS:
     Format your response as JSON with this exact structure:
     {{
         "sprint_id": "{sprint_id}",
@@ -72,7 +81,7 @@ def generate_ai_quiz(movies_data, sprint_id):
                 "movie_name": "Movie Name",
                 "multiple_choice_questions": [
                     {{
-                        "question": "Question text?",
+                        "question": "Specific and interesting question about plot detail?",
                         "options": [
                             "A. Option A text",
                             "B. Option B text", 
@@ -82,7 +91,7 @@ def generate_ai_quiz(movies_data, sprint_id):
                         "correct_answer": "A. Option A text"
                     }},
                     {{
-                        "question": "Second question?",
+                        "question": "Another specific question about memorable scene?",
                         "options": [
                             "A. Option A text",
                             "B. Option B text",
@@ -92,19 +101,23 @@ def generate_ai_quiz(movies_data, sprint_id):
                         "correct_answer": "B. Option B text"
                     }}
                 ],
-                "best_quote": "Most memorable quote from the movie",
-                "fun_trivia": "Interesting fun fact about the movie"
+                "best_quote": "Most memorable and authentic quote from the movie",
+                "fun_trivia": "Interesting behind-the-scenes fact or production detail"
             }}
         ]
     }}
     
-    Important:
-    - Create 2 questions per movie
-    - Include the letter (A, B, C, D) in both options and correct answers
-    - Make questions about plot, characters, actors, director, or interesting facts
-    - Ensure quotes are authentic and memorable
-    - Provide unique trivia that fans would find interesting
-    - Return ONLY valid JSON, no additional text
+    QUALITY CHECKS - DOUBLE VERIFY BEFORE RESPONDING:
+    - Verify ALL questions are specific and test deeper movie knowledge
+    - Verify NO generic questions about plot, setting, director, or actors
+    - Verify ALL answers are factually correct
+    - Verify quotes are authentic and memorable (not made up)
+    - Verify trivia is interesting and accurate
+    - Verify exactly 2 questions per movie
+    - Verify 4 options per question with clear correct answer
+    - Verify JSON structure is perfect with no syntax errors
+    
+    Return ONLY valid JSON, no additional text or explanations.
     """
     
     headers = {
@@ -137,6 +150,18 @@ def generate_ai_quiz(movies_data, sprint_id):
             try:
                 quiz_data = json.loads(content)
                 print(f"✅ Successfully generated quiz for {len(quiz_data['movies_quiz_data'])} movies")
+                
+                # Additional validation
+                for movie in quiz_data['movies_quiz_data']:
+                    for question in movie['multiple_choice_questions']:
+                        q_text = question['question'].lower()
+                        # Check for forbidden question types
+                        forbidden_phrases = ['what is the plot', 'who directed', 'who is the director', 
+                                           'who acted', 'who stars', 'who plays', 'main character',
+                                           'where does', 'when does', 'what year', 'genre of']
+                        if any(phrase in q_text for phrase in forbidden_phrases):
+                            print(f"⚠️ Warning: Question may be too generic: {question['question']}")
+                
                 return quiz_data
             except json.JSONDecodeError as e:
                 print(f"❌ Failed to parse AI response as JSON: {e}")
