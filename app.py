@@ -6,7 +6,7 @@ from datetime import timedelta
 # Import the modules
 from login_system import initialize_session_state, render_login_page, hash_password
 from sheets_utils import connect_google_sheets, reload_users, load_sheet
-from sprint_management import get_sprint_display_info, load_testing_config, get_current_date
+from sprint_management import get_sprint_display_info, load_testing_config, get_current_date, get_previous_sprint_quiz_data
 from page_handlers import render_dashboard, render_suggest_movie, render_voting, render_rate_movies
 from admin_panel import render_admin_panel
 from finalize_sprint import render_finalize_sprint
