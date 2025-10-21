@@ -4,7 +4,7 @@ import cloudinary.uploader
 import json
 import time
 from sheets_utils import load_sheet, connect_google_sheets
-from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime, get_current_date
+from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime, get_current_date, get_previous_sprint_quiz_data
 from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
 
 # ---------------------------------------
@@ -618,50 +618,6 @@ def render_rate_movies():
                 st.rerun()
             except Exception as e:
                 st.warning(f"Failed to save ratings: {e}")
-
-
-
-def get_previous_sprint_quiz_data():
-    """Get quiz data for the previous sprint"""
-    try:
-        # Load quiz data
-        quiz_data = load_sheet("QuizInfo")
-        
-        if not quiz_data:
-            st.write("🔍 Debug: No quiz data found")
-            return None, None
-        
-        # Load sprints to find previous sprint
-        sprints_data = load_sheet("Sprints")
-        current_date = get_current_date()
-        # Find previous sprint
-        previous_sprint = None
-        
-        for sprint in sorted(sprints_data, key=lambda x: x['end_date'], reverse=True):
-            end_date = datetime.datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
-            
-            if end_date < current_date:
-                previous_sprint = sprint
-                break
-        
-        if not previous_sprint:
-            return None, None
-        
-         
-        # Find quiz data for previous sprint
-        for quiz in quiz_data:
-            if quiz.get('sprint_id') == previous_sprint['sprint_id']:
-                try:
-                    quiz_json = json.loads(quiz.get('quiz_json', '{}'))
-                    return quiz_json, previous_sprint
-                except json.JSONDecodeError as e:
-                    continue
-        
-        return None, None
-        
-    except Exception as e:
-        st.warning(f"Error loading previous sprint quiz: {e}")
-        return None, None
 
 def get_movie_suggestions_for_sprint(sprint_id):
     """Get movie suggestions with user info for a specific sprint"""
