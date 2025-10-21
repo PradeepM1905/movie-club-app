@@ -33,6 +33,7 @@ def connect_google_sheets():
 @st.cache_data(ttl=120)
 def load_sheet(sheet_name):  # Remove sheet parameter
     try:
+        print(f"🔍 [GOOGLE SHEETS API CALL] Loading sheet: {sheet_name}")
         sheet = connect_google_sheets()  # Create sheet inside function
         return sheet.worksheet(sheet_name).get_all_records()
     except Exception as e:
