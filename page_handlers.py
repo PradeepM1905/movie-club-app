@@ -721,106 +721,140 @@ def get_movie_suggestions_for_sprint(sprint_id):
 #             st.rerun()
 
 def render_quiz_interface(quiz_data, previous_sprint):
-    """Render the quiz interface with real-time countdown timer"""
-    # CACHE THE QUIZ DATA to prevent repeated API calls
+    """Render the quiz interface with ALL questions on one page"""
+    # CACHE THE QUIZ DATA
     if 'cached_quiz_data' not in st.session_state:
         st.session_state.cached_quiz_data = quiz_data
         st.session_state.cached_previous_sprint = previous_sprint
-    else:
-        # Use cached data instead of the passed parameters (which might trigger API calls)
-        quiz_data = st.session_state.cached_quiz_data
-        previous_sprint = st.session_state.cached_previous_sprint
+        st.session_state.cached_all_questions = []
+        for movie in quiz_data.get('movies_quiz_data', []):
+            for question in movie.get('multiple_choice_questions', []):
+                st.session_state.cached_all_questions.append(question)
+    
+    # Use cached data
+    quiz_data = st.session_state.cached_quiz_data
+    previous_sprint = st.session_state.cached_previous_sprint
+    all_questions = st.session_state.cached_all_questions
     
     # Initialize quiz state
     if 'quiz_started' not in st.session_state:
         st.session_state.quiz_started = True
-        st.session_state.current_question = 0
-        st.session_state.user_answers = []
+        st.session_state.user_answers = [None] * len(all_questions)  # Pre-initialize answers
         st.session_state.quiz_score = 0
         st.session_state.quiz_completed = False
-        st.session_state.time_remaining = 20
-        st.session_state.question_start_time = time.time()
-    
-    # Get all questions FROM CACHED DATA
-    all_questions = []
-    for movie in quiz_data.get('movies_quiz_data', []):
-        for question in movie.get('multiple_choice_questions', []):
-            all_questions.append(question)
+        st.session_state.quiz_start_time = time.time()
+        st.session_state.total_quiz_time = len(all_questions) * 20  # 20 seconds per question
     
     total_questions = len(all_questions)
+    current_time = time.time()
+    elapsed_time = current_time - st.session_state.quiz_start_time
+    time_remaining = max(0, st.session_state.total_quiz_time - int(elapsed_time))
     
     # Quiz header
     st.header(f"🎯 Movie Quiz - {previous_sprint['sprint_id']}")
-    st.write(f"**{total_questions} questions • 20 seconds per question • No retries**")
+    st.write(f"**{total_questions} questions • {time_remaining//60}:{time_remaining%60:02d} total time • One-time submission**")
     st.markdown("---")
     
-    # Progress bar
-    progress = (st.session_state.current_question) / total_questions
-    st.progress(progress)
-    st.write(f"Question {st.session_state.current_question + 1} of {total_questions}")
+    # Progress and timer
+    col1, col2 = st.columns(2)
+    with col1:
+        answered = sum(1 for answer in st.session_state.user_answers if answer is not None)
+        progress = answered / total_questions
+        st.progress(progress)
+        st.write(f"Progress: {answered}/{total_questions} answered")
+    
+    with col2:
+        if time_remaining > 0:
+            mins, secs = divmod(time_remaining, 60)
+            st.warning(f"⏰ Total time remaining: {mins:02d}:{secs:02d}")
+        else:
+            st.error("⏰ Time's up! Submit your answers now.")
     
     # If quiz completed, show results
     if st.session_state.quiz_completed:
         show_quiz_results(all_questions, previous_sprint)
         return
     
-    # Current question
-    current_q = all_questions[st.session_state.current_question]
+    # Display all questions in expanders
+    st.subheader("📝 Questions")
     
-    # Display question
-    st.subheader(f"Q{st.session_state.current_question + 1}: {current_q['question']}")
-    
-    # Real-time countdown timer
-    timer_placeholder = st.empty()
-    
-    # Calculate actual time remaining
-    current_time = time.time()
-    elapsed = current_time - st.session_state.question_start_time
-    actual_time_remaining = max(0, 20 - int(elapsed))
-    
-    # Update the displayed time remaining
-    st.session_state.time_remaining = actual_time_remaining
-    
-    # Display countdown with st.empty() for real-time updates
-    with timer_placeholder.container():
-        if st.session_state.time_remaining > 0:
-            mins, secs = divmod(st.session_state.time_remaining, 60)
-            time_display = '{:02d}:{:02d}'.format(mins, secs)
+    for i, question_data in enumerate(all_questions):
+        with st.expander(f"Question {i+1}: {question_data['question'][:50]}...", expanded=False):
+            st.write(f"**{question_data['question']}**")
             
-            if st.session_state.time_remaining > 10:
-                st.success(f"⏰ Time remaining: {time_display}")
-            elif st.session_state.time_remaining > 5:
-                st.warning(f"⏰ Time remaining: {time_display}")
+            # Display options
+            selected_option = st.radio(
+                f"Select your answer for Q{i+1}:",
+                options=question_data['options'],
+                key=f"question_{i}",
+                index=None  # Start with no selection
+            )
+            
+            # Store the answer
+            if selected_option:
+                st.session_state.user_answers[i] = selected_option
+                st.success("✓ Answer saved")
+            elif st.session_state.user_answers[i] is not None:
+                st.info(f"Current selection: {st.session_state.user_answers[i]}")
             else:
-                st.error(f"⏰ Time remaining: {time_display}")
+                st.warning("⏳ Not answered yet")
+    
+    st.markdown("---")
+    
+    # Submit button
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        answered_count = sum(1 for answer in st.session_state.user_answers if answer is not None)
+        if answered_count == total_questions:
+            st.success(f"✅ All {total_questions} questions answered!")
         else:
-            st.error("⏰ Time's up!")
-            st.info(f"**Correct answer:** {current_q['correct_answer']}")
+            st.warning(f"📝 {answered_count}/{total_questions} questions answered")
     
-    # Display options
-    selected_option = st.radio(
-        "Select your answer:",
-        options=current_q['options'],
-        key=f"question_{st.session_state.current_question}"
-    )
-    
-    # Handle submissions
-    if st.session_state.time_remaining <= 0:
-        if st.button("Next Question →", key="timeout_next"):
-            handle_answer_submission(None, current_q, all_questions, previous_sprint)
-            st.session_state.question_start_time = time.time()
-            st.rerun()
-    else:
-        if selected_option and st.button("Submit Answer", type="primary"):
-            handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
-            st.session_state.question_start_time = time.time()
+    with col2:
+        if st.button("🔄 Update Timer", key="refresh_timer"):
             st.rerun()
     
-    # AUTO-REFRESH FOR TIMER - MOVED TO THE VERY END
-    # This ensures everything above gets rendered first
-    if st.session_state.time_remaining > 0:
-        time.sleep(1)
-        st.rerun()
+    with col3:
+        submit_disabled = (time_remaining <= 0) or (answered_count == total_questions)
+        if st.button("🚀 Submit Quiz", type="primary", disabled=submit_disabled):
+            calculate_and_show_results(all_questions, previous_sprint)
+    
+    # Auto-submit when time runs out
+    if time_remaining <= 0 and not st.session_state.quiz_completed:
+        st.error("⏰ Time's up! Your quiz will be automatically submitted.")
+        if st.button("Submit Now", key="auto_submit"):
+            calculate_and_show_results(all_questions, previous_sprint)
+
+def calculate_and_show_results(all_questions, previous_sprint):
+    """Calculate scores and show results"""
+    score = 0
+    results = []
+    
+    for i, question_data in enumerate(all_questions):
+        user_answer = st.session_state.user_answers[i]
+        correct_answer = question_data['correct_answer']
+        is_correct = (user_answer == correct_answer)
+        
+        if is_correct:
+            score += 1
+        
+        results.append({
+            'question': question_data['question'],
+            'user_answer': user_answer or "No answer",
+            'correct_answer': correct_answer,
+            'is_correct': is_correct
+        })
+    
+    # Update session state
+    st.session_state.quiz_score = score
+    st.session_state.user_answers_details = results
+    st.session_state.quiz_completed = True
+    
+    # Save result to Google Sheets (only ONE API call at the end)
+    save_quiz_result(previous_sprint)
+    
+    st.rerun()
 
 def handle_answer_submission(selected_option, current_question, all_questions, previous_sprint):
     """Handle answer submission and scoring"""
