@@ -9,6 +9,7 @@ import os
 def connect_google_sheets():
     """Connect to Google Sheets and return the sheet object"""
     try:
+        print("🔍 [GOOGLE SHEETS API CALL] Connecting to Google Sheets...")
         if "type" in st.secrets:
             credentials_dict = {k: st.secrets[k] for k in [
                 "type", "project_id", "private_key_id", "private_key",
