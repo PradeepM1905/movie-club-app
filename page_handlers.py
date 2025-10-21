@@ -720,7 +720,7 @@ def get_movie_suggestions_for_sprint(sprint_id):
 #             st.rerun()
 
 def render_quiz_interface(quiz_data, previous_sprint):
-    """Render the quiz interface with practical timer"""
+    """Render the quiz interface with real-time countdown timer"""
     # Initialize quiz state
     if 'quiz_started' not in st.session_state:
         st.session_state.quiz_started = True
@@ -728,6 +728,7 @@ def render_quiz_interface(quiz_data, previous_sprint):
         st.session_state.user_answers = []
         st.session_state.quiz_score = 0
         st.session_state.quiz_completed = False
+        st.session_state.time_remaining = 20
         st.session_state.question_start_time = time.time()
     
     # Get all questions
@@ -748,36 +749,6 @@ def render_quiz_interface(quiz_data, previous_sprint):
     st.progress(progress)
     st.write(f"Question {st.session_state.current_question + 1} of {total_questions}")
     
-    # Calculate elapsed time
-    current_time = time.time()
-    elapsed_time = current_time - st.session_state.question_start_time
-    time_remaining = max(0, 20 - int(elapsed_time))
-    
-    # Display timer with visual indicator
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        if time_remaining > 10:
-            st.success(f"⏰ Time remaining: {time_remaining} seconds")
-        elif time_remaining > 5:
-            st.warning(f"⏰ Time remaining: {time_remaining} seconds")
-        else:
-            st.error(f"⏰ Time remaining: {time_remaining} seconds")
-    
-    with col2:
-        if st.button("🔄 Update", key="update_timer"):
-            st.rerun()
-    
-    # If time's up, show correct answer
-    if time_remaining <= 0:
-        current_q = all_questions[st.session_state.current_question]
-        st.error("⏰ Time's up!")
-        st.info(f"**Correct answer:** {current_q['correct_answer']}")
-        
-        if st.button("Next Question →", key="timeout_next"):
-            handle_answer_submission(None, current_q, all_questions, previous_sprint)
-            st.rerun()
-        return
-    
     # If quiz completed, show results
     if st.session_state.quiz_completed:
         show_quiz_results(all_questions, previous_sprint)
@@ -789,6 +760,38 @@ def render_quiz_interface(quiz_data, previous_sprint):
     # Display question
     st.subheader(f"Q{st.session_state.current_question + 1}: {current_q['question']}")
     
+    # Real-time countdown timer
+    timer_placeholder = st.empty()
+    
+    # Calculate actual time remaining
+    current_time = time.time()
+    elapsed = current_time - st.session_state.question_start_time
+    actual_time_remaining = max(0, 20 - int(elapsed))
+    
+    # Update the displayed time remaining
+    st.session_state.time_remaining = actual_time_remaining
+    
+    # Display countdown with st.empty() for real-time updates
+    with timer_placeholder.container():
+        if st.session_state.time_remaining > 0:
+            mins, secs = divmod(st.session_state.time_remaining, 60)
+            time_display = '{:02d}:{:02d}'.format(mins, secs)
+            
+            if st.session_state.time_remaining > 10:
+                st.success(f"⏰ Time remaining: {time_display}")
+            elif st.session_state.time_remaining > 5:
+                st.warning(f"⏰ Time remaining: {time_display}")
+            else:
+                st.error(f"⏰ Time remaining: {time_display}")
+        else:
+            st.error("⏰ Time's up!")
+            st.info(f"**Correct answer:** {current_q['correct_answer']}")
+    
+    # Auto-refresh for timer (causes brief flash but keeps timer updated)
+    if st.session_state.time_remaining > 0:
+        time.sleep(1)
+        st.rerun()
+    
     # Display options
     selected_option = st.radio(
         "Select your answer:",
@@ -796,10 +799,17 @@ def render_quiz_interface(quiz_data, previous_sprint):
         key=f"question_{st.session_state.current_question}"
     )
     
-    # Submit button
-    if selected_option and st.button("Submit Answer", type="primary"):
-        handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
-        st.rerun()
+    # Handle submissions
+    if st.session_state.time_remaining <= 0:
+        if st.button("Next Question →", key="timeout_next"):
+            handle_answer_submission(None, current_q, all_questions, previous_sprint)
+            st.session_state.question_start_time = time.time()
+            st.rerun()
+    else:
+        if selected_option and st.button("Submit Answer", type="primary"):
+            handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
+            st.session_state.question_start_time = time.time()
+            st.rerun()
 
 def handle_answer_submission(selected_option, current_question, all_questions, previous_sprint):
     """Handle answer submission and scoring"""
