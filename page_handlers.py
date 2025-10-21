@@ -58,12 +58,11 @@ def render_dashboard():
     quiz_data = st.session_state.quiz_data
     previous_sprint = st.session_state.previous_sprint
 
-    # QUIZ MODAL CHECK - This should be at the VERY BEGINNING of the function
+    # QUIZ MODAL CHECK
     if st.session_state.get('show_quiz'):
-        quiz_data, previous_sprint = get_previous_sprint_quiz_data()
         if quiz_data and previous_sprint:
             render_quiz_interface(quiz_data, previous_sprint)
-            st.stop()  # This stops the rest of the dashboard from rendering
+            st.stop()
         else:
             # If no quiz data, remove the quiz state
             if 'show_show_quiz' in st.session_state:
