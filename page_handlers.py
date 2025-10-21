@@ -50,6 +50,21 @@ def render_dashboard():
         st.info("No active sprint found. Please check Sprints configuration.")
 
 
+
+    # QUIZ MODAL CHECK - This should be at the VERY BEGINNING of the function
+    if st.session_state.get('show_quiz'):
+        quiz_data, previous_sprint = get_previous_sprint_quiz_data()
+        if quiz_data and previous_sprint:
+            render_quiz_interface(quiz_data, previous_sprint)
+            st.stop()  # This stops the rest of the dashboard from rendering
+        else:
+            # If no quiz data, remove the quiz state
+            if 'show_show_quiz' in st.session_state:
+                del st.session_state['show_quiz']
+            st.error("Quiz data not available. Please try again later.")
+            st.rerun()
+            
+
     st.markdown("---")
 
     # Leaderboard Section
@@ -151,9 +166,8 @@ def render_dashboard():
 
 
     st.markdown("---")
-
-    # Quiz Section
     st.subheader("🎯 Sprint Quiz")
+    
     quiz_data, previous_sprint = get_previous_sprint_quiz_data()
     
     if quiz_data and previous_sprint:
@@ -184,9 +198,7 @@ def render_dashboard():
         st.info("No quiz available for previous sprint yet.")
     
     st.markdown("---")
-
     
-
     # Current Sprint Movies Section
     st.subheader("🎬 Current Sprint Movies")
 
