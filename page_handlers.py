@@ -739,11 +739,11 @@ def render_quiz_interface(quiz_data, previous_sprint):
     # Initialize quiz state
     if 'quiz_started' not in st.session_state:
         st.session_state.quiz_started = True
-        st.session_state.user_answers = [None] * len(all_questions)  # Pre-initialize answers
+        st.session_state.user_answers = [None] * len(all_questions)
         st.session_state.quiz_score = 0
         st.session_state.quiz_completed = False
         st.session_state.quiz_start_time = time.time()
-        st.session_state.total_quiz_time = len(all_questions) * 20  # 20 seconds per question
+        st.session_state.total_quiz_time = len(all_questions) * 20
     
     total_questions = len(all_questions)
     current_time = time.time()
@@ -804,7 +804,7 @@ def render_quiz_interface(quiz_data, previous_sprint):
     
     st.markdown("---")
     
-    # Submit button logic - FIXED
+    # Submit button logic
     answered_count = sum(1 for answer in st.session_state.user_answers if answer is not None)
     
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -820,30 +820,31 @@ def render_quiz_interface(quiz_data, previous_sprint):
             st.rerun()
     
     with col3:
-        # FIXED: Enable submit when ALL questions are answered OR time is up
+        # Enable submit when ALL questions are answered OR time is up
         submit_disabled = (answered_count < total_questions) and (time_remaining > 0)
         
         if st.button("🚀 Submit Quiz", type="primary", disabled=submit_disabled):
             calculate_and_show_results(all_questions, previous_sprint)
-    
-    # Auto-submit when time runs out (if at least one question answered)
-    if time_remaining <= 0 and not st.session_state.quiz_completed and answered_count > 0:
-        st.error("⏰ Time's up! Your quiz will be automatically submitted.")
-        if st.button("Submit Now", key="auto_submit"):
-            calculate_and_show_results(all_questions, previous_sprint)
-        # Auto-submit after 3 seconds
-        time.sleep(3)
-        if not st.session_state.quiz_completed:
-            calculate_and_show_results(all_questions, previous_sprint)
             st.rerun()
+    
+    # Auto-submit when time runs out
+    if time_remaining <= 0 and not st.session_state.quiz_completed and answered_count > 0:
+        st.error("⏰ Time's up! Auto-submitting your quiz...")
+        calculate_and_show_results(all_questions, previous_sprint)
+        st.rerun()
+    
+    # AUTO-REFRESH FOR TIMER (Safe - only if time remaining)
+    if time_remaining > 0 and not st.session_state.quiz_completed:
+        time.sleep(1)
+        st.rerun()
 
 def calculate_and_show_results(all_questions, previous_sprint):
-    """Calculate scores and show results"""
+    """Calculate scores and show results - FIXED VERSION"""
     score = 0
     results = []
     
     for i, question_data in enumerate(all_questions):
-        user_answer = st.session_state.user_answers[i]
+        user_answer = st.session_state.user_answers[i] if i < len(st.session_state.user_answers) else None
         correct_answer = question_data['correct_answer']
         is_correct = (user_answer == correct_answer)
         
@@ -859,13 +860,11 @@ def calculate_and_show_results(all_questions, previous_sprint):
     
     # Update session state
     st.session_state.quiz_score = score
-    st.session_state.user_answers_details = results
+    st.session_state.user_answers_details = results  # Store in new format
     st.session_state.quiz_completed = True
     
-    # Save result to Google Sheets (only ONE API call at the end)
+    # Save result to Google Sheets
     save_quiz_result(previous_sprint)
-    
-    st.rerun()
 
 def handle_answer_submission(selected_option, current_question, all_questions, previous_sprint):
     """Handle answer submission and scoring"""
@@ -895,22 +894,45 @@ def handle_answer_submission(selected_option, current_question, all_questions, p
         save_quiz_result(previous_sprint)
 
 def show_quiz_results(all_questions, previous_sprint):
-    """Display quiz results"""
+    """Display quiz results - FIXED VERSION"""
     st.success("🎉 Quiz Completed!")
     st.subheader(f"Your Score: {st.session_state.quiz_score}/{len(all_questions)}")
+    
+    # Calculate percentage
+    percentage = (st.session_state.quiz_score / len(all_questions)) * 100
+    st.metric("Score Percentage", f"{percentage:.1f}%")
     
     # Score breakdown
     st.markdown("---")
     st.subheader("📊 Detailed Results")
     
-    for i, answer in enumerate(st.session_state.user_answers):
+    # Check if we have user_answers_details (from new format) or user_answers (from old format)
+    if hasattr(st.session_state, 'user_answers_details'):
+        results = st.session_state.user_answers_details
+    else:
+        # Fallback: create results from old format
+        results = []
+        for i, question_data in enumerate(all_questions):
+            user_answer = st.session_state.user_answers[i] if i < len(st.session_state.user_answers) else "No answer"
+            correct_answer = question_data['correct_answer']
+            is_correct = (user_answer == correct_answer)
+            
+            results.append({
+                'question': question_data['question'],
+                'user_answer': user_answer or "No answer",
+                'correct_answer': correct_answer,
+                'is_correct': is_correct
+            })
+    
+    # Display results
+    for i, result in enumerate(results):
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.write(f"**Q{i+1}:** {answer['question']}")
-            st.write(f"**Your answer:** {answer['user_answer']}")
-            st.write(f"**Correct answer:** {answer['correct_answer']}")
+            st.write(f"**Q{i+1}:** {result['question']}")
+            st.write(f"**Your answer:** {result['user_answer']}")
+            st.write(f"**Correct answer:** {result['correct_answer']}")
         with col2:
-            if answer['is_correct']:
+            if result['is_correct']:
                 st.success("✅ Correct")
             else:
                 st.error("❌ Incorrect")
@@ -920,19 +942,11 @@ def show_quiz_results(all_questions, previous_sprint):
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔄 Take Quiz Again"):
-            # Reset quiz state
-            for key in ['quiz_started', 'current_question', 'user_answers', 
-                       'quiz_score', 'time_remaining', 'quiz_completed']:
-                if key in st.session_state:
-                    del st.session_state[key]
+            clear_quiz_cache()
             st.rerun()
     with col2:
         if st.button("🏠 Back to Dashboard"):
-            # Close quiz and return to dashboard
-            for key in ['quiz_started', 'current_question', 'user_answers', 
-                       'quiz_score', 'time_remaining', 'quiz_completed', 'show_quiz']:
-                if key in st.session_state:
-                    del st.session_state[key]
+            clear_quiz_cache()
             st.rerun()
 
 def save_quiz_result(previous_sprint):
