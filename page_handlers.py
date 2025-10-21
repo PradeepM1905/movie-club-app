@@ -3,6 +3,7 @@ import pandas as pd
 import cloudinary.uploader
 import json
 import time
+import datetime
 from sheets_utils import load_sheet, connect_google_sheets
 from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime, get_current_date, get_previous_sprint_quiz_data
 from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
@@ -261,17 +262,6 @@ def render_dashboard():
         st.info("No movies suggested yet.")
 
     st.markdown("---")
-
-# ---------------------------------------
-# PAGE: SUGGEST MOVIE
-# ---------------------------------------
-import streamlit as st
-import pandas as pd
-import cloudinary.uploader
-from sheets_utils import load_sheet, connect_google_sheets
-from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime
-from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
-import datetime
 
 # Add configuration for edit functionality at the top
 EDIT_CONFIG = {
