@@ -644,6 +644,7 @@ def render_quiz_interface(quiz_data, previous_sprint):
         st.session_state.quiz_score = 0
         st.session_state.time_remaining = 20
         st.session_state.quiz_completed = False
+        st.session_state.last_update_time = time.time()
     
     # Get all questions from all movies
     all_questions = []
@@ -662,6 +663,12 @@ def render_quiz_interface(quiz_data, previous_sprint):
     progress = (st.session_state.current_question) / total_questions
     st.progress(progress)
     st.write(f"Question {st.session_state.current_question + 1} of {total_questions}")
+    
+    # Timer logic - update based on actual time passed
+    current_time = time.time()
+    time_elapsed = current_time - st.session_state.last_update_time
+    st.session_state.time_remaining = max(0, st.session_state.time_remaining - int(time_elapsed))
+    st.session_state.last_update_time = current_time
     
     # Timer display
     timer_placeholder = st.empty()
@@ -684,31 +691,28 @@ def render_quiz_interface(quiz_data, previous_sprint):
         key=f"question_{st.session_state.current_question}"
     )
     
-    # Timer logic
-    if st.session_state.time_remaining > 0:
-        with timer_placeholder.container():
+    # Timer display and auto-submit
+    with timer_placeholder.container():
+        if st.session_state.time_remaining > 0:
             st.warning(f"⏰ Time remaining: {st.session_state.time_remaining} seconds")
-        
-        # Simulate timer (this is simplified - in real implementation, we'd need more complex timing)
-        time.sleep(1)
-        st.session_state.time_remaining -= 1
-        
-        # Auto-submit when time runs out
-        if st.session_state.time_remaining == 0:
-            handle_answer_submission(None, current_q, all_questions, previous_sprint)
-            st.rerun()
-    else:
-        # Time's up - show correct answer
-        st.error("⏰ Time's up!")
+        else:
+            st.error("⏰ Time's up!")
+    
+    # Auto-submit when time runs out
+    if st.session_state.time_remaining <= 0:
         st.info(f"**Correct answer:** {current_q['correct_answer']}")
         
         if st.button("Next Question →", key="timeout_next"):
             handle_answer_submission(None, current_q, all_questions, previous_sprint)
             st.rerun()
-    
-    # Manual submit button (if user answers before time runs out)
-    if selected_option and st.button("Submit Answer", type="primary"):
-        handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
+    else:
+        # Manual submit button (if user answers before time runs out)
+        if selected_option and st.button("Submit Answer", type="primary"):
+            handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
+            st.rerun()
+        
+        # Auto-refresh for timer (this will cause a brief flash but keep timer updated)
+        time.sleep(0.5)  # Small delay to prevent too frequent refreshes
         st.rerun()
 
 def handle_answer_submission(selected_option, current_question, all_questions, previous_sprint):
