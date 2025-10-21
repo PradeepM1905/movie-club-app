@@ -117,90 +117,48 @@ def load_testing_config():
 
 def get_previous_sprint_quiz_data():
     """Get quiz data for the previous sprint"""
-    try:
-        print("🔍 [get_previous_sprint_quiz_data] Starting function")
-        
+    try: 
         # Load quiz data
         quiz_data = load_sheet("QuizInfo")
-        print(f"🔍 [get_previous_sprint_quiz_data] Loaded {len(quiz_data)} quiz records from QuizInfo")
         
         if not quiz_data:
-            print("🔍 [get_previous_sprint_quiz_data] No quiz data found in QuizInfo sheet")
             return None, None
-        
-        # Debug: Show what's in quiz_data
-        print("🔍 [get_previous_sprint_quiz_data] QuizInfo records:")
-        for i, quiz in enumerate(quiz_data):
-            print(f"  Record {i}: sprint_id='{quiz.get('sprint_id')}', has_json={bool(quiz.get('quiz_json'))}")
         
         # Load sprints to find previous sprint
         sprints_data = load_sheet("Sprints")
-        print(f"🔍 [get_previous_sprint_quiz_data] Loaded {len(sprints_data)} sprints from Sprints sheet")
-        
         if not sprints_data:
-            print("🔍 [get_previous_sprint_quiz_data] No sprints data found")
             return None, None
         
-        # Debug: Show what's in sprints_data
-        print("🔍 [get_previous_sprint_quiz_data] Sprints data:")
-        for sprint in sprints_data:
-            print(f"  Sprint: {sprint.get('sprint_id')} - {sprint.get('start_date')} to {sprint.get('end_date')}")
-        
         current_date = get_current_date()
-        print(f"🔍 [get_previous_sprint_quiz_data] Current date: {current_date}")
         
         # Find previous sprint
         previous_sprint = None
-        print("🔍 [get_previous_sprint_quiz_data] Looking for previous sprint...")
         
         for sprint in sorted(sprints_data, key=lambda x: x['end_date'], reverse=True):
             end_date = end_date = datetime.strptime(sprint['end_date'], '%Y-%m-%d').date()
-            print(f"🔍 [get_previous_sprint_quiz_data] Checking sprint {sprint['sprint_id']}: end_date={end_date}, is_before_current={end_date < current_date}")
             
             if end_date < current_date:
                 previous_sprint = sprint
-                print(f"🔍 [get_previous_sprint_quiz_data] Found previous sprint: {sprint['sprint_id']}")
                 break
         
         if not previous_sprint:
-            print("🔍 [get_previous_sprint_quiz_data] No previous sprint found (all sprints are in future)")
             return None, None
         
-        print(f"🔍 [get_previous_sprint_quiz_data] Previous sprint identified: {previous_sprint['sprint_id']}")
-        
-        # Find quiz data for previous sprint
-        print(f"🔍 [get_previous_sprint_quiz_data] Looking for quiz data for sprint {previous_sprint['sprint_id']}...")
         for quiz in quiz_data:
-            print(f"🔍 [get_previous_sprint_quiz_data] Checking quiz record: sprint_id='{quiz.get('sprint_id')}' vs target='{previous_sprint['sprint_id']}'")
             if quiz.get('sprint_id') == previous_sprint['sprint_id']:
-                print(f"🔍 [get_previous_sprint_quiz_data] Found matching quiz data for sprint {previous_sprint['sprint_id']}")
                 try:
                     quiz_json_str = quiz.get('quiz_json', '{}')
-                    print(f"🔍 [get_previous_sprint_quiz_data] Quiz JSON string length: {len(quiz_json_str)}")
-                    print(f"🔍 [get_previous_sprint_quiz_data] First 100 chars: {quiz_json_str[:100]}...")
-                    
                     quiz_json = json.loads(quiz_json_str)
-                    print(f"🔍 [get_previous_sprint_quiz_data] Successfully parsed quiz JSON")
-                    print(f"🔍 [get_previous_sprint_quiz_data] Quiz JSON keys: {list(quiz_json.keys())}")
-                    
-                    if 'movies_quiz_data' in quiz_json:
-                        print(f"🔍 [get_previous_sprint_quiz_data] Found {len(quiz_json['movies_quiz_data'])} movies in quiz data")
-                    
                     return quiz_json, previous_sprint
                 except json.JSONDecodeError as e:
-                    print(f"🔍 [get_previous_sprint_quiz_data] Failed to parse quiz JSON: {e}")
                     continue
                 except Exception as e:
-                    print(f"🔍 [get_previous_sprint_quiz_data] Unexpected error parsing JSON: {e}")
                     continue
         
-        print(f"🔍 [get_previous_sprint_quiz_data] No quiz data found for sprint {previous_sprint['sprint_id']}")
         return None, None
         
     except Exception as e:
-        print(f"🔍 [get_previous_sprint_quiz_data] Error loading previous sprint quiz: {e}")
         import traceback
-        print(f"🔍 [get_previous_sprint_quiz_data] Traceback: {traceback.format_exc()}")
         return None, None
 
 def get_current_date():
