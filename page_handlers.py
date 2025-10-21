@@ -760,6 +760,13 @@ def render_quiz_interface(quiz_data, previous_sprint):
     # Display question
     st.subheader(f"Q{st.session_state.current_question + 1}: {current_q['question']}")
     
+    # Display options FIRST (before timer logic)
+    selected_option = st.radio(
+        "Select your answer:",
+        options=current_q['options'],
+        key=f"question_{st.session_state.current_question}"
+    )
+    
     # Real-time countdown timer
     timer_placeholder = st.empty()
     
@@ -787,29 +794,30 @@ def render_quiz_interface(quiz_data, previous_sprint):
             st.error("⏰ Time's up!")
             st.info(f"**Correct answer:** {current_q['correct_answer']}")
     
-    # Auto-refresh for timer (causes brief flash but keeps timer updated)
-    if st.session_state.time_remaining > 0:
-        time.sleep(1)
-        st.rerun()
-    
-    # Display options
-    selected_option = st.radio(
-        "Select your answer:",
-        options=current_q['options'],
-        key=f"question_{st.session_state.current_question}"
-    )
-    
     # Handle submissions
     if st.session_state.time_remaining <= 0:
+        # Time's up - show next button
         if st.button("Next Question →", key="timeout_next"):
             handle_answer_submission(None, current_q, all_questions, previous_sprint)
             st.session_state.question_start_time = time.time()
             st.rerun()
     else:
-        if selected_option and st.button("Submit Answer", type="primary"):
-            handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
-            st.session_state.question_start_time = time.time()
-            st.rerun()
+        # Timer still running - show submit button
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if selected_option and st.button("Submit Answer", type="primary"):
+                handle_answer_submission(selected_option, current_q, all_questions, previous_sprint)
+                st.session_state.question_start_time = time.time()
+                st.rerun()
+        with col2:
+            # Auto-refresh for timer (only if no answer selected yet)
+            if not selected_option:
+                time.sleep(1)
+                st.rerun()
+            else:
+                # If answer selected, show manual refresh button
+                if st.button("🔄 Update Timer", key="refresh_timer"):
+                    st.rerun()
 
 def handle_answer_submission(selected_option, current_question, all_questions, previous_sprint):
     """Handle answer submission and scoring"""
