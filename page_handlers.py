@@ -50,6 +50,13 @@ def render_dashboard():
         st.info("No active sprint found. Please check Sprints configuration.")
 
 
+    if 'dashboard_data_loaded' not in st.session_state:
+        st.session_state.quiz_data, st.session_state.previous_sprint = get_previous_sprint_quiz_data()
+        st.session_state.dashboard_data_loaded = True
+    
+    # Use cached data
+    quiz_data = st.session_state.quiz_data
+    previous_sprint = st.session_state.previous_sprint
 
     # QUIZ MODAL CHECK - This should be at the VERY BEGINNING of the function
     if st.session_state.get('show_quiz'):
