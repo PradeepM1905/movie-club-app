@@ -58,21 +58,28 @@ if not st.session_state.logged_in:
 if "enable_suggestion" not in st.session_state:
     st.session_state.enable_suggestion = True
 if "enable_voting" not in st.session_state:
-    st.session_state.enable_voting = True
+    st.session_state.enable_voting = False  # Start with voting disabled
 if "enable_rating" not in st.session_state:
     st.session_state.enable_rating = True
 
+# NEW: Voting phase control
+if "voting_phase" not in st.session_state:
+    st.session_state.voting_phase = "suggestion"  # suggestion -> voting -> results
+
 # ---------------------------------------
-# SIDEBAR NAVIGATION
+# SIDEBAR NAVIGATION - UPDATE THIS SECTION
 # ---------------------------------------
-# Load page config from Google Sheets to persist across sessions
+# Update page config loading to include voting phase
 @st.cache_data(ttl=120)
 def load_page_config():
     try:
         config_data = load_sheet("Config")
         config_dict = {}
         for row in config_data:
-            config_dict[row['key']] = row['value'].lower() == 'true'
+            if row['key'] == 'voting_phase':
+                st.session_state.voting_phase = row['value']
+            else:
+                config_dict[row['key']] = row['value'].lower() == 'true'
         return config_dict
     except:
         return {}
@@ -82,16 +89,22 @@ page_config = load_page_config()
 
 # Update session state with persisted config
 st.session_state.enable_suggestion = page_config.get('enable_suggestion', True)
-st.session_state.enable_voting = page_config.get('enable_voting', True)
+st.session_state.enable_voting = page_config.get('enable_voting', False)  # Default to False
 st.session_state.enable_rating = page_config.get('enable_rating', True)
 
-# Build menu based on user role and enabled pages
-menu = ["Dashboard"]  # Dashboard first as default
+# Build menu based on user role, enabled pages, and voting phase
+menu = ["Dashboard"]
 
+# Show suggestion page based on voting phase
+current_phase = st.session_state.get('voting_phase', 'suggestion')
 if st.session_state.enable_suggestion or st.session_state.role == "admin":
     menu.append("Suggest Movie")
-if st.session_state.enable_voting or st.session_state.role == "admin":
+
+# Show voting page only if enabled and in voting phase
+if (st.session_state.enable_voting or st.session_state.role == "admin") and current_phase == "voting":
     menu.append("Voting")
+
+# Show rating page normally
 if st.session_state.enable_rating or st.session_state.role == "admin":
     menu.append("Rate Movies")
 
@@ -99,9 +112,14 @@ if st.session_state.role == "admin":
     menu += ["Admin Panel", "Finalize Sprint"]
 
 if not menu:
-    menu = ["Dashboard"]  # Always show at least dashboard
+    menu = ["Dashboard"]
 
 selected = st.sidebar.radio("📋 Navigation", menu)
+
+# Add voting phase indicator in sidebar
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Current Phase")
+st.sidebar.write(f"**{current_phase.upper()} PHASE**")
 
 # ---------------------------------------
 # TESTING MODE STATUS (Visible to all users)
