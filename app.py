@@ -97,19 +97,25 @@ menu = ["Dashboard"]
 
 # Show suggestion page based on voting phase
 current_phase = st.session_state.get('voting_phase', 'suggestion')
-if st.session_state.enable_suggestion or st.session_state.role == "admin":
-    menu.append("Suggest Movie")
 
-# Show voting page only if enabled and in voting phase
-if (st.session_state.enable_voting or st.session_state.role == "admin") and current_phase == "voting":
-    menu.append("Voting")
-
-# Show rating page normally
-if st.session_state.enable_rating or st.session_state.role == "admin":
-    menu.append("Rate Movies")
-
+# ADMIN USERS: Show all pages regardless of phase
 if st.session_state.role == "admin":
-    menu += ["Admin Panel", "Finalize Sprint"]
+    menu.append("Suggest Movie")
+    menu.append("Voting")  # Admin always sees Voting page
+    menu.append("Rate Movies")
+    menu.append("Admin Panel")
+    menu.append("Finalize Sprint")
+else:
+    # NORMAL USERS: Page access controlled by phase and enabled flags
+    if st.session_state.enable_suggestion:
+        menu.append("Suggest Movie")
+    
+    # Show voting page only if enabled AND in voting phase
+    if st.session_state.enable_voting and current_phase == "voting":
+        menu.append("Voting")
+    
+    if st.session_state.enable_rating:
+        menu.append("Rate Movies")
 
 if not menu:
     menu = ["Dashboard"]
