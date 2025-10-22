@@ -191,6 +191,35 @@ def render_admin_panel(hash_password):
         st.session_state.enable_rating = rating_enabled
         update_page_config()
 
+
+    st.subheader("🔄 Voting Phase Control")
+    
+    current_phase = st.session_state.get('voting_phase', 'suggestion')
+    st.write(f"**Current Phase:** {current_phase.upper()}")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🔄 Set to Suggestion Phase"):
+            if update_voting_phase("suggestion"):
+                st.session_state.enable_voting = False
+                st.success("Set to suggestion phase!")
+                st.rerun()
+    
+    with col2:
+        if st.button("🔄 Set to Voting Phase"):
+            if update_voting_phase("voting"):
+                st.session_state.enable_voting = True
+                st.success("Set to voting phase!")
+                st.rerun()
+    
+    with col3:
+        if st.button("🔄 Set to Results Phase"):
+            if update_voting_phase("results"):
+                st.session_state.enable_voting = False
+                st.success("Set to results phase!")
+                st.rerun()
+
     st.subheader("User Management")
 
     tab1, tab2 = st.tabs(["Add New User", "Reset User Password"])
