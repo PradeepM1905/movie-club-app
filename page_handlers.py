@@ -503,7 +503,7 @@ def render_edit_suggestion(existing_suggestion, sprint_id):
             st.rerun()
 
 def update_movie_suggestion(existing_suggestion, new_movie_name, new_genre, new_description, new_image, sprint_id):
-    """Update movie suggestion in Google Sheets"""
+    """Update movie suggestion in Google Sheets and clean up old votes"""
     # Use existing image URL unless new image is uploaded
     image_url = existing_suggestion.get('image_url', '')
     if new_image:
@@ -515,18 +515,37 @@ def update_movie_suggestion(existing_suggestion, new_movie_name, new_genre, new_
     
     try:
         sheet = connect_google_sheets()
-        ws = sheet.worksheet("Suggestions")
+        ws_suggestions = sheet.worksheet("Suggestions")
+        ws_voting = sheet.worksheet("Voting")
         
-        # Get all suggestions to find the row to update
-        suggestions = ws.get_all_records()
+        # Get all data
+        suggestions = ws_suggestions.get_all_records()
+        votes = ws_voting.get_all_records()
         
-        # Find the row index of the user's suggestion for this sprint
+        old_movie_name = existing_suggestion.get('movie_name')
+        
+        # DELETE ALL VOTES for the user's old movie
+        votes_to_keep = []
+        for vote in votes:
+            if vote.get('movie_name') != old_movie_name:
+                votes_to_keep.append(vote)
+        
+        # Clear and rewrite Voting sheet without the old votes
+        if len(votes_to_keep) < len(votes):  # If votes were removed
+            ws_voting.clear()
+            if votes_to_keep:  # If there are headers and data
+                headers = list(votes_to_keep[0].keys())
+                ws_voting.append_row(headers)
+                for vote in votes_to_keep:
+                    ws_voting.append_row(list(vote.values()))
+        
+        # UPDATE the suggestion in Suggestions sheet
         for idx, suggestion in enumerate(suggestions, start=2):  # start=2 because of header row
             if (suggestion.get('user_name') == st.session_state.username and 
                 suggestion.get('sprint') == sprint_id):
                 
                 # Update the row
-                ws.update(f'A{idx}:G{idx}', [[
+                ws_suggestions.update(f'A{idx}:G{idx}', [[
                     sprint_id,
                     st.session_state.username,
                     new_movie_name,
@@ -535,12 +554,12 @@ def update_movie_suggestion(existing_suggestion, new_movie_name, new_genre, new_
                     image_url,
                     str(get_current_datetime())  # Update timestamp
                 ]])
-                
-                st.success("✅ Movie suggestion updated successfully!")
-                st.session_state.editing_suggestion = False
-                st.cache_data.clear()
-                st.rerun()
                 break
+        
+        st.success("✅ Movie suggestion updated! Other users will need to vote on your new movie.")
+        st.session_state.editing_suggestion = False
+        st.cache_data.clear()
+        st.rerun()
         
     except Exception as e:
         st.warning(f"Failed to update suggestion: {e}")
