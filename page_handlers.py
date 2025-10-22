@@ -704,53 +704,58 @@ def render_admin_voting_view(sprint_id):
         st.markdown("---")
 
 def render_user_voting_view(voter_name, sprint_id):
-    """Render voting page for normal users"""
-    # Check if user has already voted
-    if has_user_voted_in_sprint(voter_name, sprint_id):
-        st.success("✅ You have already voted for this sprint!")
-        
-        # Show voting results if available
-        movie_votes, total_voters, _ = get_voting_results(sprint_id)
-        if movie_votes:
-            st.subheader("📊 Current Voting Results")
-            
-            suggestions = load_sheet("Suggestions")
-            sprint_suggestions = [s for s in suggestions if s.get('sprint') == sprint_id]
-            
-            for movie in sprint_suggestions:
-                movie_name = movie['movie_name']
-                if movie_name in movie_votes:
-                    stats = movie_votes[movie_name]
-                    
-                    # Show green check for finalized movies
-                    status_icon = "✅" if is_movie_finalized(movie_name, movie_votes, total_voters) else "⏳"
-                    
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"{status_icon} **{movie_name}**")
-                    with col2:
-                        st.write(f"👁️ {stats['watched_count']} | 🙈 {stats['not_watched_count']}")
-        
-        return
-
-    st.info("🗳️ Vote Yes if you have watched the movie, No if you haven't")
-
-    movies = load_sheet("Suggestions")
+    """Render smart voting page - only show pending movies for voting"""
+    from voting_session import get_user_voting_session
     
-    if sprint_id and movies:
-        # Exclude user's own movies and get other users' movies
-        movies = [movie for movie in movies
-                  if (movie.get('sprint') == sprint_id
-                      and movie.get('user_name') != voter_name)]
-
-    if not movies:
-        st.info("No movie suggestions from other members found for current sprint.")
+    # Get user's voting session
+    session = get_user_voting_session(voter_name, sprint_id)
+    
+    # If user has voted on all movies, show results
+    if session['all_movies_voted']:
+        st.success("✅ You have voted on all movies for this sprint!")
+        show_voting_results(voter_name, sprint_id)
         return
+    
+    # Show voted movies (read-only)
+    if session['voted_movies']:
+        st.subheader("✅ Your Previous Votes")
+        for movie in session['voted_movies']:
+            show_voted_movie_card(movie)
+        st.markdown("---")
+    
+    # Show pending movies (voting enabled)
+    if session['pending_movies']:
+        st.subheader("🗳️ Movies Pending Your Vote")
+        render_pending_votes(session['pending_movies'], voter_name, sprint_id)
+    else:
+        st.info("No pending movies to vote on.")
 
-    st.info(f"Found {len(movies)} movies suggested by other members to vote on")
+def show_voted_movie_card(movie):
+    """Show a read-only card for already voted movies"""
+    col1, col2 = st.columns([1, 3])
+    
+    with col1:
+        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+            st.image(movie['image_url'], width=100)
+        else:
+            st.image("https://via.placeholder.com/100x150/333333/FFFFFF?text=No+Poster", width=100)
+    
+    with col2:
+        st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+        st.write(f"**Genre:** {movie.get('genre', 'Not specified')}")
+        
+        # Show user's vote
+        vote_status = "✅ Watched" if movie.get('user_vote') else "❌ Not Watched"
+        st.write(f"**Your vote:** {vote_status}")
+        
+        if movie.get('vote_timestamp'):
+            st.caption(f"Voted on: {movie.get('vote_timestamp')}")
+
+def render_pending_votes(pending_movies, voter_name, sprint_id):
+    """Render voting form for pending movies only"""
     votes_data = []
     
-    for movie in movies:
+    for movie in pending_movies:
         st.subheader(movie.get("movie_name", "Unknown"))
         
         col1, col2 = st.columns([1, 3])
@@ -775,8 +780,8 @@ def render_user_voting_view(voter_name, sprint_id):
         st.markdown("---")
 
     if st.button("Submit Votes", type="primary"):
-        if len(votes_data) != len(movies):
-            st.error("❌ Please vote Yes or No for all movies before submitting!")
+        if len(votes_data) != len(pending_movies):
+            st.error("❌ Please vote Yes or No for all pending movies before submitting!")
             return
 
         try:
@@ -794,6 +799,32 @@ def render_user_voting_view(voter_name, sprint_id):
 
         except Exception as e:
             st.warning(f"Failed to submit votes: {e}")
+
+def show_voting_results(voter_name, sprint_id):
+    """Show current voting results"""
+    from voting_utils import get_voting_results
+    
+    movie_votes, total_voters, _ = get_voting_results(sprint_id)
+    if movie_votes:
+        st.subheader("📊 Current Voting Results")
+        
+        suggestions = load_sheet("Suggestions")
+        sprint_suggestions = [s for s in suggestions if s.get('sprint') == sprint_id]
+        
+        for movie in sprint_suggestions:
+            movie_name = movie['movie_name']
+            if movie_name in movie_votes:
+                stats = movie_votes[movie_name]
+                
+                # Show green check for finalized movies
+                from voting_utils import is_movie_finalized
+                status_icon = "✅" if is_movie_finalized(movie_name, movie_votes, total_voters) else "⏳"
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"{status_icon} **{movie_name}**")
+                with col2:
+                    st.write(f"👁️ {stats['watched_count']} | 🙈 {stats['not_watched_count']}")
 
 
 # ---------------------------------------
