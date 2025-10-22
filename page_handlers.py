@@ -110,100 +110,103 @@ def render_dashboard():
     else:
         st.info("No user data available.")
 
-    st.markdown("---")
+    # DISABLED AI FEATURE : QUIZ INFO -> WE WILL SEE IT IN THE FUTURE ==============================================
+    # st.markdown("---")
 
-    st.subheader("📊 Last Sprint Highlights")
+    # st.subheader("📊 Last Sprint Highlights")
 
-    # Get previous sprint quiz data
-    quiz_data, previous_sprint = get_previous_sprint_quiz_data()
-    previous_sprint_suggestions = []
-    if previous_sprint:
-        previous_sprint_suggestions = get_movie_suggestions_for_sprint(previous_sprint['sprint_id'])
-    else:
-        st.write("🔍 No previous sprint found")
+    # # Get previous sprint quiz data
+    # quiz_data, previous_sprint = get_previous_sprint_quiz_data()
+    # previous_sprint_suggestions = []
+    # if previous_sprint:
+    #     previous_sprint_suggestions = get_movie_suggestions_for_sprint(previous_sprint['sprint_id'])
+    # else:
+    #     st.write("🔍 No previous sprint found")
     
-    if quiz_data and previous_sprint_suggestions:
-       if 'movies_quiz_data' in quiz_data:
-        quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
-        suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
-        matching_movies = set(quiz_movies.keys()) & set(suggestion_movies.keys())
+    # if quiz_data and previous_sprint_suggestions:
+    #    if 'movies_quiz_data' in quiz_data:
+    #     quiz_movies = {movie['movie_name']: movie for movie in quiz_data.get('movies_quiz_data', [])}
+    #     suggestion_movies = {s['movie_name']: s for s in previous_sprint_suggestions}
+    #     matching_movies = set(quiz_movies.keys()) & set(suggestion_movies.keys())
         
-        # Display each movie
-        for movie_name, suggestion in suggestion_movies.items():
-            # Add a divider at the top of each card
-            st.markdown("---")
+    #     # Display each movie
+    #     for movie_name, suggestion in suggestion_movies.items():
+    #         # Add a divider at the top of each card
+    #         st.markdown("---")
             
-            # Create columns for the entire card content
-            col1, col2 = st.columns([1, 3])
+    #         # Create columns for the entire card content
+    #         col1, col2 = st.columns([1, 3])
             
-            with col1:
-                # Movie poster
-                if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
-                    st.image(suggestion['image_url'], width=100, output_format="PNG")
-                else:
-                    st.image("https://via.placeholder.com/100x150/333333/FFFFFF?text=No+Poster", width=100, output_format="PNG")
+    #         with col1:
+    #             # Movie poster
+    #             if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
+    #                 st.image(suggestion['image_url'], width=100, output_format="PNG")
+    #             else:
+    #                 st.image("https://via.placeholder.com/100x150/333333/FFFFFF?text=No+Poster", width=100, output_format="PNG")
             
-            with col2:
-                # Movie title and suggested by (compact)
-                st.markdown(f"**{movie_name}**")
-                st.caption(f"Suggested by: {suggestion.get('user_name', 'Unknown')}")
+    #         with col2:
+    #             # Movie title and suggested by (compact)
+    #             st.markdown(f"**{movie_name}**")
+    #             st.caption(f"Suggested by: {suggestion.get('user_name', 'Unknown')}")
                 
-                # Quiz data in same column (right side)
-                if movie_name in quiz_movies:
-                    quiz_info = quiz_movies[movie_name]
+    #             # Quiz data in same column (right side)
+    #             if movie_name in quiz_movies:
+    #                 quiz_info = quiz_movies[movie_name]
                     
-                    # Best quote (compact)
-                    quote = quiz_info.get('best_quote', 'No quote available')
-                    if quote and quote != 'No quote available':
-                        st.markdown("**💬 Best Quote**")
-                        st.caption(f'"{quote}"')
+    #                 # Best quote (compact)
+    #                 quote = quiz_info.get('best_quote', 'No quote available')
+    #                 if quote and quote != 'No quote available':
+    #                     st.markdown("**💬 Best Quote**")
+    #                     st.caption(f'"{quote}"')
                     
-                    # Fun trivia (compact)
-                    trivia = quiz_info.get('fun_trivia', 'No trivia available')
-                    if trivia and trivia != 'No trivia available':
-                        st.markdown("**🎯 Fun Trivia**")
-                        st.caption(trivia)
-                else:
-                    st.caption("⚠️ No quiz data for this movie")
-    elif previous_sprint and not quiz_data:
-        st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
-    elif quiz_data and not previous_sprint_suggestions:
-        st.info("No movie suggestions found for the previous sprint.")
-    else:
-        st.info("No previous sprint data available yet.")
+    #                 # Fun trivia (compact)
+    #                 trivia = quiz_info.get('fun_trivia', 'No trivia available')
+    #                 if trivia and trivia != 'No trivia available':
+    #                     st.markdown("**🎯 Fun Trivia**")
+    #                     st.caption(trivia)
+    #             else:
+    #                 st.caption("⚠️ No quiz data for this movie")
+    # elif previous_sprint and not quiz_data:
+    #     st.info(f"Quiz data for {previous_sprint['sprint_id']} is being generated. Check back soon!")
+    # elif quiz_data and not previous_sprint_suggestions:
+    #     st.info("No movie suggestions found for the previous sprint.")
+    # else:
+    #     st.info("No previous sprint data available yet.")
 
 
-    st.markdown("---")
-    st.subheader("🎯 Sprint Quiz")
+    # st.markdown("---")
+
+    # DISABLED AI FEATURE : QUIZ INFO -> WE WILL SEE IT IN THE FUTURE ==============================================
+    # st.subheader("🎯 Sprint Quiz")
     
-    quiz_data, previous_sprint = get_previous_sprint_quiz_data()
+    # quiz_data, previous_sprint = get_previous_sprint_quiz_data()
     
-    if quiz_data and previous_sprint:
-        # Check if user already attempted the quiz
-        quiz_attempted = check_quiz_attempt(previous_sprint['sprint_id'])
+    # if quiz_data and previous_sprint:
+    #     # Check if user already attempted the quiz
+    #     quiz_attempted = check_quiz_attempt(previous_sprint['sprint_id'])
         
-        if quiz_attempted:
-            st.warning("✅ You have already attempted this sprint's quiz!")
-            # Show previous score
-            previous_score = get_previous_quiz_score(previous_sprint['sprint_id'])
-            if previous_score is not None:
-                total_questions = sum(len(movie.get('multiple_choice_questions', [])) 
-                                    for movie in quiz_data.get('movies_quiz_data', []))
-                st.write(f"Your score: **{previous_score}/{total_questions}**")
-        else:
-            st.write("Test your knowledge about the movies from the last sprint!")
-            st.write(f"**{previous_sprint['sprint_id']}** - {previous_sprint.get('description', '')}")
+    #     if quiz_attempted:
+    #         st.warning("✅ You have already attempted this sprint's quiz!")
+    #         # Show previous score
+    #         previous_score = get_previous_quiz_score(previous_sprint['sprint_id'])
+    #         if previous_score is not None:
+    #             total_questions = sum(len(movie.get('multiple_choice_questions', [])) 
+    #                                 for movie in quiz_data.get('movies_quiz_data', []))
+    #             st.write(f"Your score: **{previous_score}/{total_questions}**")
+    #     else:
+    #         st.write("Test your knowledge about the movies from the last sprint!")
+    #         st.write(f"**{previous_sprint['sprint_id']}** - {previous_sprint.get('description', '')}")
             
-            # Count total questions
-            total_questions = sum(len(movie.get('multiple_choice_questions', [])) 
-                                for movie in quiz_data.get('movies_quiz_data', []))
-            st.write(f"**{total_questions} questions** • **20 seconds per question** • **No retries**")
+    #         # Count total questions
+    #         total_questions = sum(len(movie.get('multiple_choice_questions', [])) 
+    #                             for movie in quiz_data.get('movies_quiz_data', []))
+    #         st.write(f"**{total_questions} questions** • **20 seconds per question** • **No retries**")
             
-            if st.button("🚀 Take Quiz Now", type="primary"):
-                st.session_state.show_quiz = True
-                st.rerun()
-    else:
-        st.info("No quiz available for previous sprint yet.")
+    #         if st.button("🚀 Take Quiz Now", type="primary"):
+    #             st.session_state.show_quiz = True
+    #             st.rerun()
+    # else:
+    #     st.info("No quiz available for previous sprint yet.")
     
     st.markdown("---")
     
