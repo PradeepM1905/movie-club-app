@@ -831,12 +831,12 @@ def show_voting_results(voter_name, sprint_id):
 # PAGE: RATE MOVIES
 # ---------------------------------------
 def render_rate_movies():
-    """Render the rate movies page"""
+    """Render the rate movies page with date restrictions"""
     if not st.session_state.enable_rating and st.session_state.role != "admin":
         st.warning("Rating page is currently disabled by admin.")
         return
 
-    # Display sprint information in header
+    # Display sprint information
     sprint_info = get_sprint_display_info()
     current_sprint = get_current_sprint()
     previous_sprint = get_previous_sprint()
@@ -846,6 +846,14 @@ def render_rate_movies():
 
     if rating_sprint:
         st.header(f"⭐ Rate Movies - {rating_sprint['sprint_id']}")
+        
+        # CHECK IF RATING IS ALLOWED FOR THIS SPRINT
+        from sprint_management import is_rating_allowed_for_sprint
+        if not is_rating_allowed_for_sprint(rating_sprint):
+            st.error(f"❌ Rating is not available for {rating_sprint['sprint_id']} yet!")
+            st.info(f"Rating will be available from {rating_sprint['start_date']} to {rating_sprint['end_date']} (plus 1 day)")
+            return
+            
         if rating_sprint == previous_sprint:
             st.info("📅 Rating movies from the previous sprint")
         else:
@@ -855,12 +863,7 @@ def render_rate_movies():
         st.warning("No sprint found for rating.")
         return
 
-    # Show testing mode indicator
-    from sprint_management import load_testing_config
-    testing_enabled, test_date = load_testing_config()
-    if testing_enabled:
-        st.info(f"🧪 Testing Mode: Using date {test_date}")
-
+    # Rest of the function remains the same...
     rater_name = st.session_state.username
 
     # Check if user has already rated this sprint's movies
