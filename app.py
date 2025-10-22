@@ -114,8 +114,15 @@ else:
     if st.session_state.enable_voting and current_phase == "voting":
         menu.append("Voting")
     
+    # Show rating page only if allowed for current/previous sprint
     if st.session_state.enable_rating:
-        menu.append("Rate Movies")
+        from sprint_management import get_current_sprint, get_previous_sprint, is_rating_allowed_for_sprint
+        current_sprint = get_current_sprint()
+        previous_sprint = get_previous_sprint()
+        rating_sprint = previous_sprint if previous_sprint else current_sprint
+        
+        if is_rating_allowed_for_sprint(rating_sprint):
+            menu.append("Rate Movies")
 
 if not menu:
     menu = ["Dashboard"]
