@@ -7,6 +7,7 @@ import datetime
 from sheets_utils import load_sheet, connect_google_sheets
 from sprint_management import get_current_sprint, get_previous_sprint, get_sprint_display_info, get_current_datetime, get_current_date, get_previous_sprint_quiz_data
 from user_activity import has_user_suggested_in_sprint, has_user_voted_in_sprint, has_user_rated_sprint_movies
+from voting_utils import get_voting_results, has_everyone_voted, is_movie_finalized, update_voting_phase
 
 # ---------------------------------------
 # PAGE: DASHBOARD
@@ -285,12 +286,12 @@ def get_user_movie_suggestion(user_name, sprint_id):
 # PAGE: SUGGEST MOVIE (Updated with Edit functionality)
 # ---------------------------------------
 def render_suggest_movie():
-    """Render the suggest movie page with edit functionality"""
+    """Render the suggest movie page with new voting flow"""
     if not st.session_state.enable_suggestion and st.session_state.role != "admin":
         st.warning("Suggestion page is currently disabled by admin.")
         return
 
-    # Display sprint information in header
+    # Display sprint information
     sprint_info = get_sprint_display_info()
     current_sprint = get_current_sprint()
 
@@ -299,61 +300,126 @@ def render_suggest_movie():
         st.write(f"**{sprint_info['description']}** | {sprint_info['days_remaining']} days remaining")
     else:
         st.header("🎥 Suggest a Movie")
-        st.warning("No active sprint found. Movie suggestions will not be associated with any sprint.")
-
-    # Show testing mode indicator
-    from sprint_management import load_testing_config
-    testing_enabled, test_date = load_testing_config()
-    if testing_enabled:
-        st.info(f"🧪 Testing Mode: Using date {test_date}")
+        st.warning("No active sprint found.")
+        return
 
     user_name = st.session_state.username
     sprint_id = current_sprint['sprint_id'] if current_sprint else ""
+    current_phase = st.session_state.get('voting_phase', 'suggestion')
 
-    # Check if user has already suggested in this sprint
+    # Check if user has existing suggestion
     existing_suggestion = None
     if current_sprint:
         existing_suggestion = get_user_movie_suggestion(user_name, sprint_id)
 
-    # Show edit option if user has existing suggestion and meets criteria
-    if existing_suggestion:
-        can_edit = can_edit_movie_suggestion(
-            existing_suggestion['movie_name'], 
-            user_name, 
-            sprint_id
-        )
-        
-        if can_edit:
-            st.success("✏️ You can edit your movie suggestion!")
-            if st.button("Edit My Suggestion"):
-                st.session_state.editing_suggestion = True
-                
-        if st.session_state.get('editing_suggestion'):
-            render_edit_suggestion(existing_suggestion, sprint_id)
-            return
-        else:
-            st.success("✅ You have already suggested a movie for this sprint!")
-            st.info("You can only suggest one movie per sprint.")
-            
-            # Show current suggestion details
-            st.subheader("Your Current Suggestion")
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                if existing_suggestion.get('image_url') and pd.notna(existing_suggestion['image_url']) and existing_suggestion['image_url'].strip():
-                    st.image(existing_suggestion['image_url'], width=150)
-                else:
-                    st.image("https://via.placeholder.com/150x225/333333/FFFFFF?text=No+Poster", width=150)
-            
-            with col2:
-                st.write(f"**{existing_suggestion.get('movie_name', 'Unknown Movie')}**")
-                st.write(f"**Genre:** {existing_suggestion.get('genre', 'Not specified')}")
-                st.write(f"**Where to watch:** {existing_suggestion.get('description', 'Not specified')}")
-            
-            return
+    # Get voting results if in voting phase
+    movie_votes = {}
+    total_voters = 0
+    if current_phase in ['voting', 'results'] and existing_suggestion:
+        movie_votes, total_voters, _ = get_voting_results(sprint_id)
 
-    # Original suggestion form (only show if no existing suggestion or during editing)
-    movie_name = st.text_input("Movie Name")
+    # PHASE 1: Suggestion Phase - User can suggest or see their suggestion
+    if current_phase == 'suggestion':
+        if existing_suggestion:
+            show_existing_suggestion(existing_suggestion, show_edit=False)
+        else:
+            render_suggestion_form()
+    
+    # PHASE 2: Voting Phase - User sees their suggestion with voting status
+    elif current_phase == 'voting':
+        if existing_suggestion:
+            show_existing_suggestion(existing_suggestion, show_edit=False)
+            
+            # Show voting status for user's movie
+            movie_name = existing_suggestion['movie_name']
+            if movie_name in movie_votes:
+                stats = movie_votes[movie_name]
+                st.subheader("📊 Voting Status for Your Movie")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Watched", stats['watched_count'])
+                with col2:
+                    st.metric("Not Watched", stats['not_watched_count'])
+                with col3:
+                    st.metric("Total Votes", stats['total_votes'])
+                
+                # Check if movie needs to be changed
+                watched_ratio = stats['watched_count'] / stats['total_votes'] if stats['total_votes'] > 0 else 0
+                
+                if watched_ratio >= 0.5:
+                    st.error("🚫 More than half of voters have watched this movie. Please suggest a different movie.")
+                    if st.button("✏️ Edit and Suggest New Movie"):
+                        st.session_state.editing_suggestion = True
+                elif stats['not_watched_count'] == 0:
+                    st.warning("⚠️ Everyone has watched this movie. You can keep it or suggest a new one.")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ Keep This Movie"):
+                            st.success("Movie kept for the sprint!")
+                    with col2:
+                        if st.button("✏️ Suggest New Movie"):
+                            st.session_state.editing_suggestion = True
+                else:
+                    st.success("✅ Your movie is accepted! At least one person hasn't watched it.")
+            
+            if st.session_state.get('editing_suggestion'):
+                render_edit_suggestion(existing_suggestion, sprint_id)
+        else:
+            st.error("No movie suggestion found for this sprint. Please contact admin.")
+    
+    # PHASE 3: Results Phase - Finalized movies
+    elif current_phase == 'results':
+        if existing_suggestion:
+            show_existing_suggestion(existing_suggestion, show_edit=False)
+            
+            # Show final voting results
+            movie_name = existing_suggestion['movie_name']
+            if movie_name in movie_votes:
+                stats = movie_votes[movie_name]
+                st.subheader("🎯 Final Voting Results")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Watched", stats['watched_count'])
+                    st.metric("Not Watched", stats['not_watched_count'])
+                with col2:
+                    st.metric("Total Votes", stats['total_votes'])
+                    
+                    # Show final status
+                    if is_movie_finalized(movie_name, movie_votes, total_voters):
+                        st.success("✅ FINALIZED - Movie accepted for watching")
+                    else:
+                        st.error("❌ REJECTED - Movie not accepted")
+
+
+def show_existing_suggestion(suggestion, show_edit=False):
+    """Show existing movie suggestion with details"""
+    st.success("✅ You have already suggested a movie for this sprint!")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        if suggestion.get('image_url') and pd.notna(suggestion['image_url']) and suggestion['image_url'].strip():
+            st.image(suggestion['image_url'], width=150)
+        else:
+            st.image("https://via.placeholder.com/150x225/333333/FFFFFF?text=No+Poster", width=150)
+    
+    with col2:
+        st.write(f"**{suggestion.get('movie_name', 'Unknown Movie')}**")
+        st.write(f"**Genre:** {suggestion.get('genre', 'Not specified')}")
+        st.write(f"**Where to watch:** {suggestion.get('description', 'Not specified')}")
+        st.write(f"**Suggested on:** {suggestion.get('timestamp', 'Unknown date')}")
+    
+    if show_edit and st.session_state.role == "admin":
+        if st.button("Edit Suggestion"):
+            st.session_state.editing_suggestion = True
+
+def render_suggestion_form():
+    """Render the movie suggestion form"""
+    st.subheader("🎬 Suggest a New Movie")
+    
+    movie_name = st.text_input("Movie Name *")
     genre = st.text_input("Genre")
     description = st.text_area("Where to watch it?")
     image = st.file_uploader("Upload Poster (optional)", type=["png", "jpg", "jpeg"])
@@ -375,18 +441,17 @@ def render_suggest_movie():
                 ws = sheet.worksheet("Suggestions")
                 current_timestamp = get_current_datetime()
                 
-                # Get current sprint ID or use empty string if no sprint
+                current_sprint = get_current_sprint()
                 sprint_id = current_sprint['sprint_id'] if current_sprint else ""
 
-                # Append row with sprint information
                 ws.append_row([
-                    sprint_id,          # sprint
-                    user_name,          # user_name
-                    movie_name,         # movie_name
-                    genre,              # genre
-                    description,        # description
-                    image_url,          # image_url
-                    str(current_timestamp)  # timestamp
+                    sprint_id,
+                    st.session_state.username,
+                    movie_name,
+                    genre,
+                    description,
+                    image_url,
+                    str(current_timestamp)
                 ])
                 st.success("✅ Movie suggestion submitted!")
                 st.cache_data.clear()
@@ -395,153 +460,319 @@ def render_suggest_movie():
                 st.warning(f"Failed to write suggestion: {e}")
 
 def render_edit_suggestion(existing_suggestion, sprint_id):
-    """Render the edit suggestion form"""
+    """Render the edit suggestion form - UPDATED for new flow"""
     st.subheader("✏️ Edit Your Movie Suggestion")
+    st.warning("You are editing your movie suggestion. This will replace your previous suggestion.")
     
-    # Pre-fill form with existing data
-    movie_name = st.text_input("Movie Name", value=existing_suggestion.get('movie_name', ''))
+    # Show current suggestion
+    st.write("**Current Suggestion:**")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if existing_suggestion.get('image_url') and pd.notna(existing_suggestion['image_url']) and existing_suggestion['image_url'].strip():
+            st.image(existing_suggestion['image_url'], width=120)
+        else:
+            st.image("https://via.placeholder.com/120x180/333333/FFFFFF?text=No+Poster", width=120)
+    with col2:
+        st.write(f"**{existing_suggestion.get('movie_name', 'Unknown Movie')}**")
+        st.write(f"Genre: {existing_suggestion.get('genre', '')}")
+        st.write(f"Where to watch: {existing_suggestion.get('description', '')}")
+    
+    st.markdown("---")
+    
+    # Edit form
+    movie_name = st.text_input("New Movie Name", value=existing_suggestion.get('movie_name', ''))
     genre = st.text_input("Genre", value=existing_suggestion.get('genre', ''))
     description = st.text_area("Where to watch it?", value=existing_suggestion.get('description', ''))
-    image = st.file_uploader("Upload New Poster (optional - leave empty to keep current)", 
-                           type=["png", "jpg", "jpeg"])
+    image = st.file_uploader("Upload New Poster (optional)", type=["png", "jpg", "jpeg"])
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("Save Changes"):
+        if st.button("💾 Save Changes", type="primary"):
             if not movie_name:
                 st.error("Please provide a movie name!")
             else:
-                # Use existing image URL unless new image is uploaded
-                image_url = existing_suggestion.get('image_url', '')
-                if image:
-                    try:
-                        result = cloudinary.uploader.upload(image)
-                        image_url = result.get('secure_url', '')
-                    except Exception as e:
-                        st.warning(f"Cloudinary upload failed: {e}")
-                
-                try:
-                    # Update the suggestion in Google Sheets
-                    sheet = connect_google_sheets()
-                    ws = sheet.worksheet("Suggestions")
-                    
-                    # Get all suggestions to find the row to update
-                    suggestions = ws.get_all_records()
-                    
-                    # Find the row index of the user's suggestion for this sprint
-                    for idx, suggestion in enumerate(suggestions, start=2):  # start=2 because of header row
-                        if (suggestion.get('user_name') == st.session_state.username and 
-                            suggestion.get('sprint') == sprint_id):
-                            
-                            # Update the row
-                            ws.update(f'A{idx}:G{idx}', [[
-                                sprint_id,
-                                st.session_state.username,
-                                movie_name,
-                                genre,
-                                description,
-                                image_url,
-                                str(get_current_datetime())  # Update timestamp
-                            ]])
-                            break
-                    
-                    st.success("✅ Movie suggestion updated successfully!")
-                    st.session_state.editing_suggestion = False
-                    st.cache_data.clear()
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.warning(f"Failed to update suggestion: {e}")
+                update_movie_suggestion(existing_suggestion, movie_name, genre, description, image, sprint_id)
     
     with col2:
-        if st.button("Cancel Edit"):
+        if st.button("❌ Cancel Edit"):
             st.session_state.editing_suggestion = False
             st.rerun()
+
+def update_movie_suggestion(existing_suggestion, new_movie_name, new_genre, new_description, new_image, sprint_id):
+    """Update movie suggestion in Google Sheets"""
+    # Use existing image URL unless new image is uploaded
+    image_url = existing_suggestion.get('image_url', '')
+    if new_image:
+        try:
+            result = cloudinary.uploader.upload(new_image)
+            image_url = result.get('secure_url', '')
+        except Exception as e:
+            st.warning(f"Cloudinary upload failed: {e}")
+    
+    try:
+        sheet = connect_google_sheets()
+        ws = sheet.worksheet("Suggestions")
+        
+        # Get all suggestions to find the row to update
+        suggestions = ws.get_all_records()
+        
+        # Find the row index of the user's suggestion for this sprint
+        for idx, suggestion in enumerate(suggestions, start=2):  # start=2 because of header row
+            if (suggestion.get('user_name') == st.session_state.username and 
+                suggestion.get('sprint') == sprint_id):
+                
+                # Update the row
+                ws.update(f'A{idx}:G{idx}', [[
+                    sprint_id,
+                    st.session_state.username,
+                    new_movie_name,
+                    new_genre,
+                    new_description,
+                    image_url,
+                    str(get_current_datetime())  # Update timestamp
+                ]])
+                
+                st.success("✅ Movie suggestion updated successfully!")
+                st.session_state.editing_suggestion = False
+                st.cache_data.clear()
+                st.rerun()
+                break
+        
+    except Exception as e:
+        st.warning(f"Failed to update suggestion: {e}")
 
 # ---------------------------------------
 # PAGE: VOTING
 # ---------------------------------------
 def render_voting():
-    """Render the voting page"""
+    """Render the voting page with admin controls"""
+    current_phase = st.session_state.get('voting_phase', 'suggestion')
+    
+    # Only show voting in voting phase
+    if current_phase != 'voting' and st.session_state.role != 'admin':
+        st.warning("Voting is not currently active.")
+        return
+
     if not st.session_state.enable_voting and st.session_state.role != "admin":
         st.warning("Voting page is currently disabled by admin.")
         return
 
-    # Display sprint information in header
+    # Display sprint information
     sprint_info = get_sprint_display_info()
     current_sprint = get_current_sprint()
 
     if sprint_info and current_sprint:
         st.header(f"🗳️ Voting - {sprint_info['sprint_id']}")
-        st.write(f"**Have You Watched These Movies?**")
     else:
         st.header("🗳️ Voting")
         st.warning("No active sprint found for voting.")
         return
 
-    # Show testing mode indicator
-    from sprint_management import load_testing_config
-    testing_enabled, test_date = load_testing_config()
-    if testing_enabled:
-        st.info(f"🧪 Testing Mode: Using date {test_date}")
-
     voter_name = st.session_state.username
+    sprint_id = current_sprint['sprint_id']
 
-    # Check if user has already voted in this sprint
-    if has_user_voted_in_sprint(voter_name, current_sprint['sprint_id']):
+    # ADMIN VIEW - With controls and statistics
+    if st.session_state.role == "admin":
+        render_admin_voting_view(sprint_id)
+    # USER VIEW - Normal voting interface
+    else:
+        render_user_voting_view(voter_name, sprint_id)
+
+def render_admin_voting_view(sprint_id):
+    """Render voting page for admin with controls"""
+    st.info("👑 Admin Voting View - You can see results but cannot vote")
+    
+    # Load data
+    suggestions = load_sheet("Suggestions")
+    votes = load_sheet("Voting")
+    users = load_sheet("Users")
+    
+    sprint_suggestions = [s for s in suggestions if s.get('sprint') == sprint_id]
+    normal_users = [u for u in users if u.get('role', 'normal').lower() == 'normal']
+    
+    # Admin controls
+    st.subheader("🛠️ Admin Controls")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Send for Voting button
+        if st.button("🚀 Send for Voting", type="primary"):
+            if update_voting_phase("voting"):
+                st.session_state.enable_voting = True
+                st.success("Voting phase started! Users can now vote.")
+                st.rerun()
+    
+    with col2:
+        # Check if everyone has voted
+        everyone_voted = has_everyone_voted(sprint_id)
+        if everyone_voted:
+            st.success("✅ All users have voted!")
+            if st.button("📢 Publish Voting Results"):
+                if update_voting_phase("results"):
+                    st.session_state.enable_voting = False
+                    st.success("Voting results published!")
+                    st.rerun()
+        else:
+            st.warning("⏳ Waiting for all users to vote")
+    
+    with col3:
+        if st.button("↩️ Back to Suggestion Phase"):
+            if update_voting_phase("suggestion"):
+                st.session_state.enable_voting = False
+                st.success("Back to suggestion phase!")
+                st.rerun()
+    
+    # Voting statistics
+    st.subheader("📊 Voting Statistics")
+    
+    movie_votes, total_voters, total_votes = get_voting_results(sprint_id)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Movies Suggested", len(sprint_suggestions))
+    with col2:
+        st.metric("Total Voters", len(normal_users))
+    with col3:
+        st.metric("Votes Cast", total_votes)
+    with col4:
+        voted_users = len(set(v['user_name'] for v in votes if any(
+            s['movie_name'] == v['movie_name'] for s in sprint_suggestions
+        )))
+        st.metric("Users Voted", f"{voted_users}/{len(normal_users)}")
+    
+    # Detailed voting results
+    st.subheader("🎬 Movie Voting Results")
+    
+    for movie in sprint_suggestions:
+        movie_name = movie['movie_name']
+        
+        col1, col2 = st.columns([1, 3])
+        
+        with col1:
+            if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                st.image(movie['image_url'], width=120)
+            else:
+                st.image("https://via.placeholder.com/120x180/333333/FFFFFF?text=No+Poster", width=120)
+        
+        with col2:
+            st.write(f"**{movie_name}**")
+            st.write(f"*Suggested by: {movie['user_name']}*")
+            
+            if movie_name in movie_votes:
+                stats = movie_votes[movie_name]
+                
+                col2a, col2b, col2c, col2d = st.columns(4)
+                with col2a:
+                    st.metric("Watched", stats['watched_count'])
+                with col2b:
+                    st.metric("Not Watched", stats['not_watched_count'])
+                with col2c:
+                    st.metric("Total", stats['total_votes'])
+                with col2d:
+                    watched_ratio = stats['watched_count'] / stats['total_votes'] if stats['total_votes'] > 0 else 0
+                    if watched_ratio >= 0.5:
+                        st.error("REJECT")
+                    elif stats['not_watched_count'] > 0:
+                        st.success("ACCEPT")
+                    else:
+                        st.warning("ALL WATCHED")
+        
+        st.markdown("---")
+
+def render_user_voting_view(voter_name, sprint_id):
+    """Render voting page for normal users"""
+    # Check if user has already voted
+    if has_user_voted_in_sprint(voter_name, sprint_id):
         st.success("✅ You have already voted for this sprint!")
-        st.info("You can only vote once per sprint.")
+        
+        # Show voting results if available
+        movie_votes, total_voters, _ = get_voting_results(sprint_id)
+        if movie_votes:
+            st.subheader("📊 Current Voting Results")
+            
+            suggestions = load_sheet("Suggestions")
+            sprint_suggestions = [s for s in suggestions if s.get('sprint') == sprint_id]
+            
+            for movie in sprint_suggestions:
+                movie_name = movie['movie_name']
+                if movie_name in movie_votes:
+                    stats = movie_votes[movie_name]
+                    
+                    # Show green check for finalized movies
+                    status_icon = "✅" if is_movie_finalized(movie_name, movie_votes, total_voters) else "⏳"
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"{status_icon} **{movie_name}** (by {movie['user_name']})")
+                    with col2:
+                        st.write(f"👁️ {stats['watched_count']} | 🙈 {stats['not_watched_count']}")
+        
         return
 
-    movies = load_sheet("Suggestions")
+    st.info("🗳️ Vote Yes if you have watched the movie, No if you haven't")
 
-    if current_sprint and movies:
+    movies = load_sheet("Suggestions")
+    
+    if sprint_id and movies:
+        # Exclude user's own movies and get other users' movies
         movies = [movie for movie in movies
-                  if (movie.get('sprint') == current_sprint['sprint_id']
-                      and movie.get('user_name') != voter_name)]  # Exclude user's own movies
+                  if (movie.get('sprint') == sprint_id
+                      and movie.get('user_name') != voter_name)]
 
     if not movies:
         st.info("No movie suggestions from other members found for current sprint.")
-    else:
-        st.info(f"Found {len(movies)} movies suggested by other members to vote on")
-        votes_data = []
-        for movie in movies:
-            st.subheader(movie.get("movie_name", "Unknown"))
-            st.write(f"Genre: {movie.get('genre','')}")
-            st.write(f"Where to watch: {movie.get('description','')}")
+        return
+
+    st.info(f"Found {len(movies)} movies suggested by other members to vote on")
+    votes_data = []
+    
+    for movie in movies:
+        st.subheader(movie.get("movie_name", "Unknown"))
+        
+        col1, col2 = st.columns([1, 3])
+        with col1:
             if movie.get("image_url"):
-                st.image(movie["image_url"], width=200)
+                st.image(movie["image_url"], width=150)
+            else:
+                st.image("https://via.placeholder.com/150x225/333333/FFFFFF?text=No+Poster", width=150)
+        
+        with col2:
+            st.write(f"**Genre:** {movie.get('genre','')}")
+            st.write(f"**Where to watch:** {movie.get('description','')}")
+            st.write(f"**Suggested by:** {movie.get('user_name','')}")
+            
             watched = st.radio(
                 f"Have you watched {movie.get('movie_name', 'this movie')}?",
                 options=["Yes", "No"],
-                key=f"vote_{movie.get('movie_name','')}"
+                key=f"vote_{movie.get('movie_name','')}_{voter_name}"
             )
-            watched = watched == "Yes"
-            st.markdown("---")
-            votes_data.append((movie.get('movie_name',''), watched))
+            watched_bool = watched == "Yes"
+            votes_data.append((movie.get('movie_name',''), watched_bool))
 
-        if st.button("Submit Votes"):
-            # Validate that all movies have been voted on
-            if len(votes_data) != len(movies):
-                st.error("❌ Please vote Yes or No for all movies before submitting!")
-                return
+        st.markdown("---")
 
-            try:
-                sheet = connect_google_sheets()
-                ws = sheet.worksheet("Voting")
-                current_timestamp = get_current_datetime()
-                for movie_name, watched in votes_data:
-                    ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
-                st.cache_data.clear()
+    if st.button("Submit Votes", type="primary"):
+        if len(votes_data) != len(movies):
+            st.error("❌ Please vote Yes or No for all movies before submitting!")
+            return
 
-                # Show success and use session state to redirect
-                st.success("✅ Votes submitted successfully!")
-                st.balloons()
-                st.rerun()
+        try:
+            sheet = connect_google_sheets()
+            ws = sheet.worksheet("Voting")
+            current_timestamp = get_current_datetime()
+            
+            for movie_name, watched in votes_data:
+                ws.append_row([movie_name, voter_name, watched, str(current_timestamp)])
+            
+            st.cache_data.clear()
+            st.success("✅ Votes submitted successfully!")
+            st.balloons()
+            st.rerun()
 
-            except Exception as e:
-                st.warning(f"Failed to submit votes: {e}")
+        except Exception as e:
+            st.warning(f"Failed to submit votes: {e}")
 
 
 # ---------------------------------------
