@@ -55,6 +55,24 @@ def get_previous_sprint():
         st.warning(f"Error loading previous sprint: {e}")
         return None
 
+def is_rating_allowed_for_sprint(sprint_data):
+    """Check if rating is allowed for a sprint (between start date and end date + 1 day)"""
+    if not sprint_data:
+        return False
+    
+    try:
+        current_date = get_current_date()
+        start_date = datetime.strptime(sprint_data['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(sprint_data['end_date'], '%Y-%m-%d').date()
+        
+        # Rating allowed from start date to end date + 1 day
+        rating_end_date = end_date + timedelta(days=1)
+        
+        return start_date <= current_date <= rating_end_date
+    except Exception as e:
+        st.warning(f"Error checking rating period: {e}")
+        return False
+
 def get_sprint_display_info():
     """Get sprint information for display"""
     current_sprint = get_current_sprint()
