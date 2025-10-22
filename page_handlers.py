@@ -705,7 +705,7 @@ def render_user_voting_view(voter_name, sprint_id):
                     
                     col1, col2 = st.columns([3, 1])
                     with col1:
-                        st.write(f"{status_icon} **{movie_name}** (by {movie['user_name']})")
+                        st.write(f"{status_icon} **{movie_name}**")
                     with col2:
                         st.write(f"👁️ {stats['watched_count']} | 🙈 {stats['not_watched_count']}")
         
@@ -741,7 +741,6 @@ def render_user_voting_view(voter_name, sprint_id):
         with col2:
             st.write(f"**Genre:** {movie.get('genre','')}")
             st.write(f"**Where to watch:** {movie.get('description','')}")
-            st.write(f"**Suggested by:** {movie.get('user_name','')}")
             
             watched = st.radio(
                 f"Have you watched {movie.get('movie_name', 'this movie')}?",
