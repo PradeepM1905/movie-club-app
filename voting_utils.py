@@ -33,10 +33,30 @@ def get_voting_results(sprint_id):
         for vote in sprint_votes:
             movie_name = vote['movie_name']
             if movie_name in movie_votes:
-                if vote.get('watched') in [True, 'True', 'true', 'Yes', 'yes']:
+                watched_value = vote.get('watched')
+                
+                # FIXED: Handle all possible boolean representations
+                is_watched = False
+                
+                # Handle Python boolean True/False
+                if watched_value is True:
+                    is_watched = True
+                # Handle string representations (case-insensitive)
+                elif isinstance(watched_value, str):
+                    watched_lower = watched_value.lower().strip()
+                    if watched_lower in ['true', 'yes', '1', 't', 'y']:
+                        is_watched = True
+                    elif watched_lower in ['false', 'no', '0', 'f', 'n']:
+                        is_watched = False
+                # Handle other truthy/falsy values
+                else:
+                    is_watched = bool(watched_value)
+                
+                if is_watched:
                     movie_votes[movie_name]['watched_count'] += 1
                 else:
                     movie_votes[movie_name]['not_watched_count'] += 1
+                    
                 movie_votes[movie_name]['total_votes'] += 1
         
         # Calculate percentages
