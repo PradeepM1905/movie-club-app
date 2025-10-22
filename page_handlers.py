@@ -524,20 +524,20 @@ def update_movie_suggestion(existing_suggestion, new_movie_name, new_genre, new_
         
         old_movie_name = existing_suggestion.get('movie_name')
         
-        # DELETE ALL VOTES for the user's old movie
-        votes_to_keep = []
-        for vote in votes:
-            if vote.get('movie_name') != old_movie_name:
-                votes_to_keep.append(vote)
+        # # DELETE ALL VOTES for the user's old movie
+        # votes_to_keep = []
+        # for vote in votes:
+        #     if vote.get('movie_name') != old_movie_name:
+        #         votes_to_keep.append(vote)
         
-        # Clear and rewrite Voting sheet without the old votes
-        if len(votes_to_keep) < len(votes):  # If votes were removed
-            ws_voting.clear()
-            if votes_to_keep:  # If there are headers and data
-                headers = list(votes_to_keep[0].keys())
-                ws_voting.append_row(headers)
-                for vote in votes_to_keep:
-                    ws_voting.append_row(list(vote.values()))
+        # # Clear and rewrite Voting sheet without the old votes
+        # if len(votes_to_keep) < len(votes):  # If votes were removed
+        #     ws_voting.clear()
+        #     if votes_to_keep:  # If there are headers and data
+        #         headers = list(votes_to_keep[0].keys())
+        #         ws_voting.append_row(headers)
+        #         for vote in votes_to_keep:
+        #             ws_voting.append_row(list(vote.values()))
         
         # UPDATE the suggestion in Suggestions sheet
         for idx, suggestion in enumerate(suggestions, start=2):  # start=2 because of header row
