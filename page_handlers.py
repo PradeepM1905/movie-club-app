@@ -225,50 +225,94 @@ def render_dashboard():
             ratings = load_sheet("Ratings")
             df_ratings = pd.DataFrame(ratings) if ratings else pd.DataFrame()
             
-            # Display movies in a grid layout
+            # Display movies in a grid layout with better separation
             cols = st.columns(3)  # 3 columns for the grid
     
             for idx, movie in current_sprint_suggestions.iterrows():
                 col_idx = idx % 3
                 with cols[col_idx]:
-                    # Movie poster/image with smaller size
-                    if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                        st.image(movie['image_url'],
-                                 width=200,  # Fixed smaller width
-                                 output_format="PNG")
-                    else:
-                        # Placeholder with smaller dimensions
-                        st.image("https://via.placeholder.com/200x300/333333/FFFFFF?text=No+Poster",
-                                 width=200,  # Fixed smaller width
-                                 output_format="PNG")
-    
-                    # Movie title and genre
-                    st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
-                    st.write(f"*{movie.get('genre', 'Not specified')}*")
-                    
-                    # BONUS INFORMATION
-                    if not df_ratings.empty and sprint_info:
-                        # Check if this movie has any ratings where people actually watched it
-                        movie_ratings = df_ratings[
-                            (df_ratings['movie_name'] == movie['movie_name']) & 
-                            (df_ratings['sprint'] == sprint_info['sprint_id']) &
-                            (df_ratings['did_not_watch'] == False)
-                        ]
+                    # Create a card container with border and padding
+                    with st.container():
+                        # Add custom CSS for card styling
+                        st.markdown("""
+                        <style>
+                        .movie-card {
+                            border: 1px solid #ddd;
+                            border-radius: 10px;
+                            padding: 15px;
+                            margin: 10px 0;
+                            background-color: #f9f9f9;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        }
+                        .bonus-eligible {
+                            border-left: 5px solid #28a745;
+                            background-color: #f8fff9;
+                        }
+                        .no-bonus {
+                            border-left: 5px solid #6c757d;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
                         
-                        if len(movie_ratings) == 0:
-                            # No one watched this movie - eligible for bonus
-                            st.success("🎁 +0.5 Bonus Eligible!")
+                        # Check bonus eligibility
+                        is_bonus_eligible = False
+                        if not df_ratings.empty and sprint_info:
+                            # Check if this movie has any ratings where people actually watched it
+                            movie_ratings = df_ratings[
+                                (df_ratings['movie_name'] == movie['movie_name']) & 
+                                (df_ratings['sprint'] == sprint_info['sprint_id']) &
+                                (df_ratings['did_not_watch'] == False)
+                            ]
+                            
+                            if len(movie_ratings) == 0:
+                                is_bonus_eligible = True
+                        
+                        # Apply different styling based on bonus eligibility
+                        card_class = "movie-card bonus-eligible" if is_bonus_eligible else "movie-card no-bonus"
+                        
+                        # Movie poster/image with smaller size
+                        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                            st.image(movie['image_url'],
+                                     width=180,  # Slightly larger for better visibility
+                                     output_format="PNG")
                         else:
-                            # People watched this movie - no bonus
-                            st.info(f"👥 {len(movie_ratings)} ratings")
+                            # Placeholder with smaller dimensions
+                            st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster",
+                                     width=180,
+                                     output_format="PNG")
     
-                    # Add some spacing between cards
-                    st.markdown("<br>", unsafe_allow_html=True)
+                        # Movie title and genre with bonus indicator
+                        st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+                        st.write(f"*{movie.get('genre', 'Not specified')}*")
+                        
+                        # BONUS INFORMATION with clear visual indicator
+                        if is_bonus_eligible:
+                            st.success("🎁 **+0.5 Bonus Eligible!**")
+                            st.caption("No one has watched this movie yet")
+                        else:
+                            if not df_ratings.empty and sprint_info:
+                                movie_ratings = df_ratings[
+                                    (df_ratings['movie_name'] == movie['movie_name']) & 
+                                    (df_ratings['sprint'] == sprint_info['sprint_id']) &
+                                    (df_ratings['did_not_watch'] == False)
+                                ]
+                                if len(movie_ratings) > 0:
+                                    st.info(f"👥 {len(movie_ratings)} ratings")
+                                else:
+                                    st.caption("No ratings yet")
+                            else:
+                                st.caption("Rating data not available")
+                        
+                        # Add subtle separator between cards
+                        st.markdown("---")
+                        
+                        # Apply the card styling
+                        st.markdown(f'<div class="{card_class}">', unsafe_allow_html=True)
+                        
         else:
             st.info("No movies suggested for current sprint.")
     else:
         st.info("No movies suggested yet.")
-
     st.markdown("---")
 
 # Add configuration for edit functionality at the top
