@@ -313,7 +313,6 @@ def render_dashboard():
                         # BONUS INFORMATION based on voting
                         if is_bonus_eligible:
                             st.success("🎁 **+0.5 Bonus Eligible!**")
-                            st.caption("No one has watched this movie")
                         else:
                             st.info(vote_status)
                     
