@@ -221,9 +221,8 @@ def render_dashboard():
             current_sprint_suggestions = df_suggestions
     
         if not current_sprint_suggestions.empty:
-            # Load ratings to check for bonus eligibility
-            ratings = load_sheet("Ratings")
-            df_ratings = pd.DataFrame(ratings) if ratings else pd.DataFrame()
+            # Load VOTING data to check for bonus eligibility (not ratings)
+            votes = load_sheet("Voting")
             
             # Display movies in a grid layout with better separation
             cols = st.columns(3)  # 3 columns for the grid
@@ -254,29 +253,47 @@ def render_dashboard():
                         </style>
                         """, unsafe_allow_html=True)
                         
-                        # Check bonus eligibility
+                        # Check bonus eligibility from VOTING data
+                        movie_name = movie['movie_name']
+                        movie_votes = [v for v in votes if v.get('movie_name') == movie_name]
+                        
                         is_bonus_eligible = False
-                        if not df_ratings.empty and sprint_info:
-                            # Check if this movie has any ratings where people actually watched it
-                            movie_ratings = df_ratings[
-                                (df_ratings['movie_name'] == movie['movie_name']) & 
-                                (df_ratings['sprint'] == sprint_info['sprint_id']) &
-                                (df_ratings['did_not_watch'] == False)
-                            ]
+                        vote_status = "No votes yet"
+                        
+                        if movie_votes:
+                            # Count how many people have watched this movie
+                            watched_count = 0
+                            for vote in movie_votes:
+                                watched_value = vote.get('watched')
+                                # Handle different boolean representations
+                                if isinstance(watched_value, bool):
+                                    if watched_value:
+                                        watched_count += 1
+                                elif isinstance(watched_value, str):
+                                    if watched_value.lower() in ['true', 'yes', '1', 't', 'y']:
+                                        watched_count += 1
+                                elif watched_value:  # Handle other truthy values
+                                    watched_count += 1
                             
-                            if len(movie_ratings) == 0:
+                            total_votes = len(movie_votes)
+                            
+                            if watched_count == 0 and total_votes > 0:
                                 is_bonus_eligible = True
+                                vote_status = f"🎁 +0.5 Bonus Eligible!"
+                            else:
+                                vote_status = f"👥 {watched_count}/{total_votes} watched"
+                        else:
+                            vote_status = "⏳ No votes yet"
                         
                         # Apply different styling based on bonus eligibility
                         card_class = "movie-card bonus-eligible" if is_bonus_eligible else "movie-card no-bonus"
                         
-                        # Movie poster/image with smaller size
+                        # Movie poster/image
                         if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
                             st.image(movie['image_url'],
-                                     width=180,  # Slightly larger for better visibility
+                                     width=180,
                                      output_format="PNG")
                         else:
-                            # Placeholder with smaller dimensions
                             st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster",
                                      width=180,
                                      output_format="PNG")
@@ -285,23 +302,12 @@ def render_dashboard():
                         st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
                         st.write(f"*{movie.get('genre', 'Not specified')}*")
                         
-                        # BONUS INFORMATION with clear visual indicator
+                        # BONUS INFORMATION based on voting
                         if is_bonus_eligible:
                             st.success("🎁 **+0.5 Bonus Eligible!**")
-                            st.caption("No one has watched this movie yet")
+                            st.caption("No one has watched this movie")
                         else:
-                            if not df_ratings.empty and sprint_info:
-                                movie_ratings = df_ratings[
-                                    (df_ratings['movie_name'] == movie['movie_name']) & 
-                                    (df_ratings['sprint'] == sprint_info['sprint_id']) &
-                                    (df_ratings['did_not_watch'] == False)
-                                ]
-                                if len(movie_ratings) > 0:
-                                    st.info(f"👥 {len(movie_ratings)} ratings")
-                                else:
-                                    st.caption("No ratings yet")
-                            else:
-                                st.caption("Rating data not available")
+                            st.info(vote_status)
                         
                         # Add subtle separator between cards
                         st.markdown("---")
@@ -313,6 +319,7 @@ def render_dashboard():
             st.info("No movies suggested for current sprint.")
     else:
         st.info("No movies suggested yet.")
+    
     st.markdown("---")
 
 # Add configuration for edit functionality at the top
