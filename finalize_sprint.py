@@ -79,14 +79,19 @@ def render_finalize_sprint(hash_password):
     # Check if points already calculated for this sprint
     points_already_calculated = False
     try:
-        points_data = load_sheet("Points")
-        # Check if any points entry exists for current sprint
-        for point_entry in points_data:
-            if point_entry.get('sprint') == current_sprint['sprint_id']:
-                points_already_calculated = True
-                break
-    except:
-        pass
+    points_data = load_sheet("Points")
+    st.write(f"🔍 DEBUG: Loaded {len(points_data)} entries from Points sheet")
+    st.write(f"🔍 DEBUG: Current sprint ID we're checking: {current_sprint['sprint_id']}")
+    
+    # Check if any points entry exists for current sprint
+    for i, point_entry in enumerate(points_data):
+        st.write(f"🔍 DEBUG: Points entry {i}: sprint='{point_entry.get('sprint')}', user='{point_entry.get('user_name')}'")
+        if point_entry.get('sprint') == current_sprint['sprint_id']:
+            points_already_calculated = True
+            st.write(f"🔍 DEBUG: MATCH FOUND! Points already calculated for sprint {current_sprint['sprint_id']}")
+            break
+    except Exception as e:
+        st.write(f"🔍 DEBUG: Error loading points data: {e}")
     
     if points_already_calculated:
         st.error(f"❌ Points for {current_sprint['sprint_id']} have already been calculated!")
