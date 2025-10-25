@@ -252,38 +252,58 @@ def render_dashboard():
                     else:
                         vote_status = "⏳ No votes yet"
                     
-                    # METHOD 1: Use a colored border with st.info/st.success
-                    if is_bonus_eligible:
-                        # Green border for bonus eligible
-                        st.success("")  # Empty success for green border
-                        container = st.container()
-                        with container:
-                            # Movie content
-                            if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                                st.image(movie['image_url'], width=160)
-                            else:
-                                st.image("https://via.placeholder.com/160x240/333333/FFFFFF?text=No+Poster", width=160)
-                            
-                            st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
-                            st.write(f"*{movie.get('genre', 'Not specified')}*")
+                    # Create a proper container for each movie card
+                    with st.container():
+                        # Apply border using custom CSS for THIS specific container
+                        if is_bonus_eligible:
+                            st.markdown(
+                                """
+                                <style>
+                                div[data-testid="stVerticalBlock"] {
+                                    border: 2px solid #28a745;
+                                    border-radius: 10px;
+                                    padding: 10px;
+                                    margin: 5px 0;
+                                    background-color: #f8fff9;
+                                }
+                                </style>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.markdown(
+                                """
+                                <style>
+                                div[data-testid="stVerticalBlock"] {
+                                    border: 1px solid #e0e0e0;
+                                    border-radius: 10px;
+                                    padding: 10px;
+                                    margin: 5px 0;
+                                    background-color: #f9f9f9;
+                                }
+                                </style>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        
+                        # Movie poster
+                        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                            st.image(movie['image_url'], width=160)
+                        else:
+                            st.image("https://via.placeholder.com/160x240/333333/FFFFFF?text=No+Poster", width=160)
+    
+                        # Movie info
+                        st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+                        st.write(f"*{movie.get('genre', 'Not specified')}*")
+                        
+                        # Bonus status
+                        if is_bonus_eligible:
                             st.success("🎁 **+0.5 Bonus Eligible!**")
-                    else:
-                        # Blue border for regular movies
-                        st.info("")  # Empty info for blue border
-                        container = st.container()
-                        with container:
-                            # Movie content
-                            if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                                st.image(movie['image_url'], width=160)
-                            else:
-                                st.image("https://via.placeholder.com/160x240/333333/FFFFFF?text=No+Poster", width=160)
-                            
-                            st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
-                            st.write(f"*{movie.get('genre', 'Not specified')}*")
+                        else:
                             st.info(vote_status)
                     
-                    # Add spacing between movie cards
-                    st.write("")  # Empty line for spacing
+                    # Add spacing between cards
+                    st.write("")
                         
         else:
             st.info("No movies suggested for current sprint.")
