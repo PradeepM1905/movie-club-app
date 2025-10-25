@@ -221,16 +221,16 @@ def render_dashboard():
             current_sprint_suggestions = df_suggestions
     
         if not current_sprint_suggestions.empty:
-            # Load VOTING data to check for bonus eligibility (not ratings)
+            # Load VOTING data to check for bonus eligibility
             votes = load_sheet("Voting")
             
             # Display movies in a grid layout
-            cols = st.columns(3)  # 3 columns for the grid
+            cols = st.columns(3)
     
             for idx, movie in current_sprint_suggestions.iterrows():
                 col_idx = idx % 3
                 with cols[col_idx]:
-                    # Check bonus eligibility from VOTING data
+                    # Check bonus eligibility
                     movie_name = movie['movie_name']
                     movie_votes = [v for v in votes if v.get('movie_name') == movie_name]
                     
@@ -238,19 +238,9 @@ def render_dashboard():
                     vote_status = "No votes yet"
                     
                     if movie_votes:
-                        # Count how many people have watched this movie
-                        watched_count = 0
-                        for vote in movie_votes:
-                            watched_value = vote.get('watched')
-                            # Handle different boolean representations
-                            if isinstance(watched_value, bool):
-                                if watched_value:
-                                    watched_count += 1
-                            elif isinstance(watched_value, str):
-                                if watched_value.lower() in ['true', 'yes', '1', 't', 'y']:
-                                    watched_count += 1
-                            elif watched_value:  # Handle other truthy values
-                                watched_count += 1
+                        watched_count = sum(1 for v in movie_votes if 
+                                           (isinstance(v.get('watched'), bool) and v.get('watched')) or
+                                           (isinstance(v.get('watched'), str) and v.get('watched').lower() in ['true', 'yes', '1', 't', 'y']))
                         
                         total_votes = len(movie_votes)
                         
@@ -262,62 +252,38 @@ def render_dashboard():
                     else:
                         vote_status = "⏳ No votes yet"
                     
-                    # Use Streamlit container with border instead of custom CSS
-                    with st.container():
-                        # Apply border styling based on bonus eligibility
-                        if is_bonus_eligible:
-                            st.markdown(
-                                """
-                                <style>
-                                div[data-testid="stContainer"] {
-                                    border: 2px solid #28a745;
-                                    border-radius: 10px;
-                                    padding: 15px;
-                                    margin: 10px 0;
-                                    background-color: #f8fff9;
-                                }
-                                </style>
-                                """,
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            st.markdown(
-                                """
-                                <style>
-                                div[data-testid="stContainer"] {
-                                    border: 1px solid #ddd;
-                                    border-radius: 10px;
-                                    padding: 15px;
-                                    margin: 10px 0;
-                                    background-color: #f9f9f9;
-                                }
-                                </style>
-                                """,
-                                unsafe_allow_html=True
-                            )
-                        
-                        # Movie poster/image
-                        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                            st.image(movie['image_url'],
-                                     width=180,
-                                     output_format="PNG")
-                        else:
-                            st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster",
-                                     width=180,
-                                     output_format="PNG")
-    
-                        # Movie title and genre with bonus indicator
-                        st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
-                        st.write(f"*{movie.get('genre', 'Not specified')}*")
-                        
-                        # BONUS INFORMATION based on voting
-                        if is_bonus_eligible:
+                    # METHOD 1: Use a colored border with st.info/st.success
+                    if is_bonus_eligible:
+                        # Green border for bonus eligible
+                        st.success("")  # Empty success for green border
+                        container = st.container()
+                        with container:
+                            # Movie content
+                            if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                                st.image(movie['image_url'], width=160)
+                            else:
+                                st.image("https://via.placeholder.com/160x240/333333/FFFFFF?text=No+Poster", width=160)
+                            
+                            st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+                            st.write(f"*{movie.get('genre', 'Not specified')}*")
                             st.success("🎁 **+0.5 Bonus Eligible!**")
-                        else:
+                    else:
+                        # Blue border for regular movies
+                        st.info("")  # Empty info for blue border
+                        container = st.container()
+                        with container:
+                            # Movie content
+                            if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                                st.image(movie['image_url'], width=160)
+                            else:
+                                st.image("https://via.placeholder.com/160x240/333333/FFFFFF?text=No+Poster", width=160)
+                            
+                            st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+                            st.write(f"*{movie.get('genre', 'Not specified')}*")
                             st.info(vote_status)
                     
-                    # Add spacing between cards
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    # Add spacing between movie cards
+                    st.write("")  # Empty line for spacing
                         
         else:
             st.info("No movies suggested for current sprint.")
