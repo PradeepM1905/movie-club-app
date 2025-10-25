@@ -31,11 +31,13 @@ def render_finalize_sprint(hash_password):
     # Load current data - filter for current sprint
     all_suggestions = load_sheet("Suggestions")
     all_ratings = load_sheet("Ratings")
+    all_votes = load_sheet("Voting")  # ADDED: Load voting data for bonus calculation
     users_data = load_sheet("Users")
 
     # Filter data for current sprint
     suggestions = [s for s in all_suggestions if s.get('sprint') == current_sprint['sprint_id']]
     ratings = [r for r in all_ratings if r.get('sprint') == current_sprint['sprint_id']]
+    votes = [v for v in all_votes]  # We'll filter by movie name later
 
     if not suggestions:
         st.warning("No movie suggestions found for this sprint.")
@@ -89,6 +91,33 @@ def render_finalize_sprint(hash_password):
         for _, row in df_suggestions.iterrows():
             movie_to_suggester[row['movie_name']] = row['user_name']
 
+        # FIXED: Calculate bonus eligibility from VOTING data, not ratings
+        movie_bonus_eligible = {}
+        for movie_name in movie_to_suggester.keys():
+            # Get all votes for this movie
+            movie_votes = [v for v in votes if v.get('movie_name') == movie_name]
+            
+            if movie_votes:
+                # Count how many people have watched this movie
+                watched_count = 0
+                for vote in movie_votes:
+                    watched_value = vote.get('watched')
+                    # Handle different boolean representations
+                    if isinstance(watched_value, bool):
+                        if watched_value:
+                            watched_count += 1
+                    elif isinstance(watched_value, str):
+                        if watched_value.lower() in ['true', 'yes', '1', 't', 'y']:
+                            watched_count += 1
+                    elif watched_value:  # Handle other truthy values
+                        watched_count += 1
+                
+                # Movie gets bonus if NO ONE has watched it (watched_count == 0)
+                movie_bonus_eligible[movie_name] = (watched_count == 0)
+            else:
+                # If no votes, no bonus (need votes to determine)
+                movie_bonus_eligible[movie_name] = False
+
         # Calculate points for each user
         for user in df_users['user_name'].tolist():
             # Get movies suggested by this user
@@ -102,8 +131,7 @@ def render_finalize_sprint(hash_password):
             bonus = 0
             unwatched_suggestions = []
             for movie in user_suggested_movies:
-                movie_ratings = df_ratings[(df_ratings['movie_name'] == movie) & (~df_ratings['did_not_watch'])]
-                if len(movie_ratings) == 0:
+                if movie_bonus_eligible.get(movie, False):
                     bonus += bonus_per_new_movie
                     unwatched_suggestions.append(movie)
 
@@ -127,8 +155,8 @@ def render_finalize_sprint(hash_password):
                 # Calculate deduction for this specific movie (distributed evenly)
                 movie_deduction = -deduction_per_movie  # Negative because it's a deduction
 
-                # Calculate bonus for this specific movie
-                movie_bonus = bonus_per_new_movie if movie in unwatched_suggestions else 0
+                # Calculate bonus for this specific movie - FIXED: Use voting-based bonus
+                movie_bonus = bonus_per_new_movie if movie_bonus_eligible.get(movie, False) else 0
 
                 # Final total for this movie
                 final_total = average_point + movie_deduction + movie_bonus
@@ -207,6 +235,14 @@ def render_finalize_sprint(hash_password):
 
         df_point_info = pd.DataFrame(point_info_data)
         st.dataframe(df_point_info, use_container_width=True)
+
+        # Show bonus summary
+        st.subheader("🎁 Bonus Summary")
+        bonus_movies = [movie for movie, eligible in movie_bonus_eligible.items() if eligible]
+        if bonus_movies:
+            st.success(f"Movies eligible for +0.5 bonus: {', '.join(bonus_movies)}")
+        else:
+            st.info("No movies eligible for bonus this sprint")
 
         # WhatsApp Messages Section
         st.markdown("---")
