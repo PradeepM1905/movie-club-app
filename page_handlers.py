@@ -224,96 +224,97 @@ def render_dashboard():
             # Load VOTING data to check for bonus eligibility (not ratings)
             votes = load_sheet("Voting")
             
+            # Add custom CSS for card styling (ONCE at the top)
+            st.markdown("""
+            <style>
+            .movie-card {
+                border: 1px solid #ddd;
+                border-radius: 10px;
+                padding: 15px;
+                margin: 10px 0;
+                background-color: #f9f9f9;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .bonus-eligible {
+                border-left: 5px solid #28a745;
+                background-color: #f8fff9;
+            }
+            .no-bonus {
+                border-left: 5px solid #6c757d;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             # Display movies in a grid layout with better separation
             cols = st.columns(3)  # 3 columns for the grid
     
             for idx, movie in current_sprint_suggestions.iterrows():
                 col_idx = idx % 3
                 with cols[col_idx]:
-                    # Create a card container with border and padding
-                    with st.container():
-                        # Add custom CSS for card styling
-                        st.markdown("""
-                        <style>
-                        .movie-card {
-                            border: 1px solid #ddd;
-                            border-radius: 10px;
-                            padding: 15px;
-                            margin: 10px 0;
-                            background-color: #f9f9f9;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        }
-                        .bonus-eligible {
-                            border-left: 5px solid #28a745;
-                            background-color: #f8fff9;
-                        }
-                        .no-bonus {
-                            border-left: 5px solid #6c757d;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-                        
-                        # Check bonus eligibility from VOTING data
-                        movie_name = movie['movie_name']
-                        movie_votes = [v for v in votes if v.get('movie_name') == movie_name]
-                        
-                        is_bonus_eligible = False
-                        vote_status = "No votes yet"
-                        
-                        if movie_votes:
-                            # Count how many people have watched this movie
-                            watched_count = 0
-                            for vote in movie_votes:
-                                watched_value = vote.get('watched')
-                                # Handle different boolean representations
-                                if isinstance(watched_value, bool):
-                                    if watched_value:
-                                        watched_count += 1
-                                elif isinstance(watched_value, str):
-                                    if watched_value.lower() in ['true', 'yes', '1', 't', 'y']:
-                                        watched_count += 1
-                                elif watched_value:  # Handle other truthy values
+                    # Check bonus eligibility from VOTING data
+                    movie_name = movie['movie_name']
+                    movie_votes = [v for v in votes if v.get('movie_name') == movie_name]
+                    
+                    is_bonus_eligible = False
+                    vote_status = "No votes yet"
+                    
+                    if movie_votes:
+                        # Count how many people have watched this movie
+                        watched_count = 0
+                        for vote in movie_votes:
+                            watched_value = vote.get('watched')
+                            # Handle different boolean representations
+                            if isinstance(watched_value, bool):
+                                if watched_value:
                                     watched_count += 1
-                            
-                            total_votes = len(movie_votes)
-                            
-                            if watched_count == 0 and total_votes > 0:
-                                is_bonus_eligible = True
-                                vote_status = f"🎁 +0.5 Bonus Eligible!"
-                            else:
-                                vote_status = f"👥 {watched_count}/{total_votes} watched"
-                        else:
-                            vote_status = "⏳ No votes yet"
+                            elif isinstance(watched_value, str):
+                                if watched_value.lower() in ['true', 'yes', '1', 't', 'y']:
+                                    watched_count += 1
+                            elif watched_value:  # Handle other truthy values
+                                watched_count += 1
                         
-                        # Apply different styling based on bonus eligibility
-                        card_class = "movie-card bonus-eligible" if is_bonus_eligible else "movie-card no-bonus"
+                        total_votes = len(movie_votes)
                         
-                        # Movie poster/image
-                        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                            st.image(movie['image_url'],
-                                     width=180,
-                                     output_format="PNG")
+                        if watched_count == 0 and total_votes > 0:
+                            is_bonus_eligible = True
+                            vote_status = f"🎁 +0.5 Bonus Eligible!"
                         else:
-                            st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster",
-                                     width=180,
-                                     output_format="PNG")
+                            vote_status = f"👥 {watched_count}/{total_votes} watched"
+                    else:
+                        vote_status = "⏳ No votes yet"
+                    
+                    # Apply different styling based on bonus eligibility
+                    card_class = "movie-card bonus-eligible" if is_bonus_eligible else "movie-card no-bonus"
+                    
+                    # Wrap the entire movie content in the card container
+                    st.markdown(f'<div class="{card_class}">', unsafe_allow_html=True)
+                    
+                    # Movie poster/image
+                    if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                        st.image(movie['image_url'],
+                                 width=180,
+                                 output_format="PNG")
+                    else:
+                        st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster",
+                                 width=180,
+                                 output_format="PNG")
     
-                        # Movie title and genre with bonus indicator
-                        st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
-                        st.write(f"*{movie.get('genre', 'Not specified')}*")
-                        
-                        # BONUS INFORMATION based on voting
-                        if is_bonus_eligible:
-                            st.success("🎁 **+0.5 Bonus Eligible!**")
-                            st.caption("No one has watched this movie")
-                        else:
-                            st.info(vote_status)
-                        
-                        # Add subtle separator between cards
-                        st.markdown("---")
-                        
-                        # Apply the card styling
-                        st.markdown(f'<div class="{card_class}">', unsafe_allow_html=True)
+                    # Movie title and genre with bonus indicator
+                    st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+                    st.write(f"*{movie.get('genre', 'Not specified')}*")
+                    
+                    # BONUS INFORMATION based on voting
+                    if is_bonus_eligible:
+                        st.success("🎁 **+0.5 Bonus Eligible!**")
+                        st.caption("No one has watched this movie")
+                    else:
+                        st.info(vote_status)
+                    
+                    # Close the card container
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Add spacing between cards
+                    st.markdown("<br>", unsafe_allow_html=True)
                         
         else:
             st.info("No movies suggested for current sprint.")
