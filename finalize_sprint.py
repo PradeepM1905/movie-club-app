@@ -247,7 +247,7 @@ def render_finalize_sprint(hash_password):
                 if user_name in user_points:
                     # Update points and sprint_id
                     ws_users.update_cell(i, 3, round(user_points[user_name], 3))
-                    ws_users.update_cell(i, 5, current_sprint['sprint_id'])
+                    ws_users.update_cell(i, 4, current_sprint['sprint_id'])
     
             st.success("✅ Sprint points calculated and saved successfully!")
     
