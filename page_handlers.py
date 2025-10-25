@@ -212,18 +212,22 @@ def render_dashboard():
     
     # Current Sprint Movies Section
     st.subheader("🎬 Current Sprint Movies")
-
+    
     if not df_suggestions.empty:
         # Filter suggestions for current sprint if available
         if sprint_info:
             current_sprint_suggestions = df_suggestions[df_suggestions['sprint'] == sprint_info['sprint_id']]
         else:
             current_sprint_suggestions = df_suggestions
-
+    
         if not current_sprint_suggestions.empty:
+            # Load ratings to check for bonus eligibility
+            ratings = load_sheet("Ratings")
+            df_ratings = pd.DataFrame(ratings) if ratings else pd.DataFrame()
+            
             # Display movies in a grid layout
             cols = st.columns(3)  # 3 columns for the grid
-
+    
             for idx, movie in current_sprint_suggestions.iterrows():
                 col_idx = idx % 3
                 with cols[col_idx]:
@@ -237,11 +241,27 @@ def render_dashboard():
                         st.image("https://via.placeholder.com/200x300/333333/FFFFFF?text=No+Poster",
                                  width=200,  # Fixed smaller width
                                  output_format="PNG")
-
-                    # Movie title and genre only
+    
+                    # Movie title and genre
                     st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
                     st.write(f"*{movie.get('genre', 'Not specified')}*")
-
+                    
+                    # BONUS INFORMATION
+                    if not df_ratings.empty and sprint_info:
+                        # Check if this movie has any ratings where people actually watched it
+                        movie_ratings = df_ratings[
+                            (df_ratings['movie_name'] == movie['movie_name']) & 
+                            (df_ratings['sprint'] == sprint_info['sprint_id']) &
+                            (df_ratings['did_not_watch'] == False)
+                        ]
+                        
+                        if len(movie_ratings) == 0:
+                            # No one watched this movie - eligible for bonus
+                            st.success("🎁 +0.5 Bonus Eligible!")
+                        else:
+                            # People watched this movie - no bonus
+                            st.info(f"👥 {len(movie_ratings)} ratings")
+    
                     # Add some spacing between cards
                     st.markdown("<br>", unsafe_allow_html=True)
         else:
