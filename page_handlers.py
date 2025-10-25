@@ -236,6 +236,8 @@ def render_dashboard():
                     
                     is_bonus_eligible = False
                     vote_status = "No votes yet"
+                    watched_count = 0
+                    total_votes = 0
                     
                     if movie_votes:
                         watched_count = sum(1 for v in movie_votes if 
@@ -248,7 +250,7 @@ def render_dashboard():
                             is_bonus_eligible = True
                             vote_status = f"🎁 +0.5 Bonus Eligible!"
                         else:
-                            vote_status = f"👥 {watched_count}/{total_votes} watched"
+                            vote_status = f"❌ No Bonus {watched_count}/{total_votes} watched"
                     else:
                         vote_status = "⏳ No votes yet"
                     
@@ -266,9 +268,9 @@ def render_dashboard():
                         # Bonus status with color coding
                         if is_bonus_eligible:
                             st.success("🎁 **+0.5 Bonus Eligible!**")
-                            st.caption("No one has watched this movie")
+                            # Removed "No one has watched this movie" caption
                         else:
-                            st.info(vote_status)
+                            st.error(f"❌ **No Bonus** {watched_count}/{total_votes} watched")  # Changed to st.error for red color
                     
                     # Add spacing between cards
                     st.write("")
