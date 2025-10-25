@@ -224,28 +224,7 @@ def render_dashboard():
             # Load VOTING data to check for bonus eligibility (not ratings)
             votes = load_sheet("Voting")
             
-            # Add custom CSS for card styling (ONCE at the top)
-            st.markdown("""
-            <style>
-            .movie-card {
-                border: 1px solid #ddd;
-                border-radius: 10px;
-                padding: 15px;
-                margin: 10px 0;
-                background-color: #f9f9f9;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .bonus-eligible {
-                border-left: 5px solid #28a745;
-                background-color: #f8fff9;
-            }
-            .no-bonus {
-                border-left: 5px solid #6c757d;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # Display movies in a grid layout with better separation
+            # Display movies in a grid layout
             cols = st.columns(3)  # 3 columns for the grid
     
             for idx, movie in current_sprint_suggestions.iterrows():
@@ -283,35 +262,60 @@ def render_dashboard():
                     else:
                         vote_status = "⏳ No votes yet"
                     
-                    # Apply different styling based on bonus eligibility
-                    card_class = "movie-card bonus-eligible" if is_bonus_eligible else "movie-card no-bonus"
-                    
-                    # Wrap the entire movie content in the card container
-                    st.markdown(f'<div class="{card_class}">', unsafe_allow_html=True)
-                    
-                    # Movie poster/image
-                    if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
-                        st.image(movie['image_url'],
-                                 width=180,
-                                 output_format="PNG")
-                    else:
-                        st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster",
-                                 width=180,
-                                 output_format="PNG")
+                    # Use Streamlit container with border instead of custom CSS
+                    with st.container():
+                        # Apply border styling based on bonus eligibility
+                        if is_bonus_eligible:
+                            st.markdown(
+                                """
+                                <style>
+                                div[data-testid="stContainer"] {
+                                    border: 2px solid #28a745;
+                                    border-radius: 10px;
+                                    padding: 15px;
+                                    margin: 10px 0;
+                                    background-color: #f8fff9;
+                                }
+                                </style>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.markdown(
+                                """
+                                <style>
+                                div[data-testid="stContainer"] {
+                                    border: 1px solid #ddd;
+                                    border-radius: 10px;
+                                    padding: 15px;
+                                    margin: 10px 0;
+                                    background-color: #f9f9f9;
+                                }
+                                </style>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        
+                        # Movie poster/image
+                        if movie.get('image_url') and pd.notna(movie['image_url']) and movie['image_url'].strip():
+                            st.image(movie['image_url'],
+                                     width=180,
+                                     output_format="PNG")
+                        else:
+                            st.image("https://via.placeholder.com/180x270/333333/FFFFFF?text=No+Poster",
+                                     width=180,
+                                     output_format="PNG")
     
-                    # Movie title and genre with bonus indicator
-                    st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
-                    st.write(f"*{movie.get('genre', 'Not specified')}*")
-                    
-                    # BONUS INFORMATION based on voting
-                    if is_bonus_eligible:
-                        st.success("🎁 **+0.5 Bonus Eligible!**")
-                        st.caption("No one has watched this movie")
-                    else:
-                        st.info(vote_status)
-                    
-                    # Close the card container
-                    st.markdown('</div>', unsafe_allow_html=True)
+                        # Movie title and genre with bonus indicator
+                        st.write(f"**{movie.get('movie_name', 'Unknown Movie')}**")
+                        st.write(f"*{movie.get('genre', 'Not specified')}*")
+                        
+                        # BONUS INFORMATION based on voting
+                        if is_bonus_eligible:
+                            st.success("🎁 **+0.5 Bonus Eligible!**")
+                            st.caption("No one has watched this movie")
+                        else:
+                            st.info(vote_status)
                     
                     # Add spacing between cards
                     st.markdown("<br>", unsafe_allow_html=True)
